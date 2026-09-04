@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+@theme {
+  --color-arena-dark: #0B0F17;
+  --color-arena-card: #131B2A;
+  --color-arena-cardLight: #1E293B;
+  --color-arena-accent: #F59E0B;
+  --color-arena-accentHover: #D97706;
+  --color-arena-sand: #E2C391;
+  --color-arena-emerald: #10B981;
+  --color-arena-emeraldDark: #047857;
+  --color-arena-cyan: #06B6D4;
+  --color-arena-rose: #F43F5E;
+
+  --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  --font-display: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+
+  --shadow-glow-amber: 0 0 25px -5px rgba(245, 158, 11, 0.35);
+  --shadow-glow-emerald: 0 0 25px -5px rgba(16, 185, 129, 0.35);
+  --shadow-glow-cyan: 0 0 25px -5px rgba(6, 182, 212, 0.35);
+}
+
+body {
+  background-color: #0B0F17;
+  color: #f1f5f9;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  background-image: 
+    radial-gradient(at 15% 10%, rgba(245, 158, 11, 0.08) 0px, transparent 50%),
+    radial-gradient(at 85% 90%, rgba(16, 185, 129, 0.06) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(15, 23, 42, 0.5) 0px, transparent 100%);
+  background-attachment: fixed;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0d131f;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Glassmorphism helpers */
+.glass-panel {
+  background: rgba(19, 27, 42, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.glass-panel-glow {
+  background: rgba(19, 27, 42, 0.9);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  box-shadow: 0 0 20px -5px rgba(245, 158, 11, 0.15);
+}
+
+.glass-card {
+  background: rgba(30, 41, 59, 0.65);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.2s ease-in-out;
+}
+
+.glass-card:hover {
+  border-color: rgba(245, 158, 11, 0.35);
+  transform: translateY(-2px);
+}
+
+/* Print styles for bracket */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
