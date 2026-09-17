@@ -57,6 +57,11 @@ export default function ScheduleManager({
   const [lunchStart, setLunchStart] = useState(savedConfig.lunchBreak?.startTime || '12:30');
   const [lunchDuration, setLunchDuration] = useState(savedConfig.lunchBreak?.duration || 45);
 
+  // Category Court Configuration: { [catId]: 'ALL' | [courtId, ...] }
+  const [categoryCourtsConfig, setCategoryCourtsConfig] = useState(
+    savedConfig.categoryCourtsConfig || {}
+  );
+
   // Category Order state
   const [categoryOrder, setCategoryOrder] = useState(() => {
     if (savedConfig.categoryOrder && Array.isArray(savedConfig.categoryOrder)) {
@@ -86,7 +91,6 @@ export default function ScheduleManager({
 
   // Handle reorder categories
   const moveCategory = (index, direction) => {
-    if (isReadOnly) return;
     const targetIndex = index + direction;
     if (targetIndex < 0 || targetIndex >= categoryOrder.length) return;
     const newOrder = [...categoryOrder];
@@ -96,9 +100,44 @@ export default function ScheduleManager({
     setCategoryOrder(newOrder);
   };
 
+  // Toggle category court restriction
+  const handleSetCategoryCourts = (catId, mode) => {
+    setCategoryCourtsConfig(prev => ({
+      ...prev,
+      [catId]: mode // 'ALL' or array
+    }));
+  };
+
+  const handleToggleCategoryCourt = (catId, courtId) => {
+    setCategoryCourtsConfig(prev => {
+      const current = prev[catId];
+      let updated;
+      if (!current || current === 'ALL') {
+        updated = [courtId];
+      } else if (Array.isArray(current)) {
+        if (current.includes(courtId)) {
+          updated = current.filter(id => id !== courtId);
+          if (updated.length === 0) {
+            updated = 'ALL';
+          }
+        } else {
+          updated = [...current, courtId];
+          if (updated.length >= activeCourts.length) {
+            updated = 'ALL';
+          }
+        }
+      } else {
+        updated = [courtId];
+      }
+      return {
+        ...prev,
+        [catId]: updated
+      };
+    });
+  };
+
   // Toggle court selection
   const toggleCourt = (courtId) => {
-    if (isReadOnly) return;
     setSelectedCourtIds(prev => {
       if (prev.includes(courtId)) {
         if (prev.length <= 1) {
@@ -122,6 +161,7 @@ export default function ScheduleManager({
       courtSwitchDuration: Number(courtSwitchDuration),
       selectedCourtIds,
       categoryOrder,
+      categoryCourtsConfig,
       lunchBreak: {
         enabled: lunchEnabled,
         startTime: lunchStart,
@@ -260,16 +300,34 @@ export default function ScheduleManager({
 
       const catStartMinutes = Math.min(...courtNextFreeTime);
 
-      // Schedule each match across available courts
-      catMatchesList.forEach((item) => {
-        // Find court that is free earliest
-        let chosenCourtIndex = 0;
-        let earliestFree = courtNextFreeTime[0];
+      // Determine allowed courts for this category
+      const catCourts = categoryCourtsConfig[cat.id];
+      let allowedCourtIndices = [];
 
-        for (let c = 1; c < courtsCount; c++) {
-          if (courtNextFreeTime[c] < earliestFree) {
-            earliestFree = courtNextFreeTime[c];
-            chosenCourtIndex = c;
+      if (!catCourts || catCourts === 'ALL') {
+        // All active courts without restriction
+        allowedCourtIndices = activeCourts.map((_, idx) => idx);
+      } else if (Array.isArray(catCourts) && catCourts.length > 0) {
+        allowedCourtIndices = activeCourts
+          .map((c, idx) => (catCourts.includes(c.id) ? idx : -1))
+          .filter(idx => idx !== -1);
+      }
+
+      if (allowedCourtIndices.length === 0) {
+        allowedCourtIndices = activeCourts.map((_, idx) => idx);
+      }
+
+      // Schedule each match across available courts respecting category restrictions
+      catMatchesList.forEach((item) => {
+        // Find court that is free earliest AMONG the allowed courts for this category
+        let chosenCourtIndex = allowedCourtIndices[0];
+        let earliestFree = courtNextFreeTime[chosenCourtIndex];
+
+        for (let i = 1; i < allowedCourtIndices.length; i++) {
+          const cIdx = allowedCourtIndices[i];
+          if (courtNextFreeTime[cIdx] < earliestFree) {
+            earliestFree = courtNextFreeTime[cIdx];
+            chosenCourtIndex = cIdx;
           }
         }
 
@@ -380,21 +438,19 @@ export default function ScheduleManager({
     window.print();
   };
 
-  // Copy schedule as plain text for WhatsApp
+  // Copy schedule as plain text for WhatsApp - APENAS A PARTE DA GRADE DE HORÁRIOS
   const handleCopyScheduleText = () => {
-    let text = `📅 *PROGRAMAÇÃO OFICIAL - ${eventInfo?.name || 'TORNEIO DE FUTVÔLEI'}*\n`;
-    text += `⏰ Início: ${overallStats.tournamentStartTime} | Término Previsto: ${overallStats.tournamentEndTime}\n`;
-    text += `🏟️ Quadras em Uso: ${overallStats.courtsUsed} | Duração por Jogo: ${overallStats.slotPerGameMinutes} min\n\n`;
+    if (filteredMatches.length === 0) {
+      alert('Nenhum jogo na grade para copiar.');
+      return;
+    }
 
-    text += `📋 *ORDEM DAS CATEGORIAS:*\n`;
-    categorySummaries.forEach((s, idx) => {
-      text += `${idx + 1}. *${s.category.name}* (${s.teamsCount} duplas - ${s.matchesCount} jogos) ➔ ${s.startTimeFormatted} às ${s.endTimeFormatted}\n`;
-    });
+    let text = `📅 *GRADE DE HORÁRIOS - ${eventInfo?.name || 'TORNEIO DE FUTVÔLEI'}*\n`;
+    text += `⏰ Início: ${overallStats.tournamentStartTime} | Término Previsto: ${overallStats.tournamentEndTime}\n\n`;
 
-    text += `\n🎾 *GRADE DE JOGOS:*\n`;
-    scheduledMatches.forEach((m) => {
-      text += `⏱️ ${m.timeFormatted} | ${m.court.name} | [${m.category.shortName}] ${m.roundName}\n`;
-      text += `   👉 ${m.team1Name} vs ${m.team2Name}\n\n`;
+    filteredMatches.forEach((m) => {
+      text += `⏱️ *${m.timeFormatted}* | 🏟️ *${m.court.name}* | [${m.category.shortName}] ${m.roundName}\n`;
+      text += `👉 *${m.team1Name}* vs *${m.team2Name}*\n\n`;
     });
 
     navigator.clipboard.writeText(text).then(() => {
@@ -407,7 +463,7 @@ export default function ScheduleManager({
     <div className="space-y-6">
 
       {/* Top Header & Action Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-5 rounded-2xl border border-slate-800">
+      <div className="schedule-header-section flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-5 rounded-2xl border border-slate-800">
         <div>
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
@@ -424,25 +480,25 @@ export default function ScheduleManager({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 no-print">
           {/* WhatsApp Copy Button */}
           <button
             onClick={handleCopyScheduleText}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all active:scale-95"
-            title="Copiar programação para WhatsApp"
+            title="Copiar apenas a grade de horários para WhatsApp"
           >
             {copiedNotification ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-emerald-400" />}
-            <span>{copiedNotification ? 'Copiado!' : 'Copiar p/ WhatsApp'}</span>
+            <span>{copiedNotification ? 'Copiado!' : 'Copiar Grade p/ WhatsApp'}</span>
           </button>
 
           {/* Print Button */}
           <button
             onClick={handlePrint}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all active:scale-95"
-            title="Imprimir grade oficial"
+            title="Imprimir apenas a grade oficial de horários"
           >
             <Printer className="w-4 h-4 text-amber-400" />
-            <span>Imprimir</span>
+            <span>Imprimir Grade</span>
           </button>
 
           {/* Save Configuration Button */}
@@ -459,7 +515,7 @@ export default function ScheduleManager({
       </div>
 
       {/* KPI Overview Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="schedule-kpis-section grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="glass-panel p-4 rounded-2xl border border-slate-800">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-400">INÍCIO & TÉRMINO</span>
@@ -525,7 +581,7 @@ export default function ScheduleManager({
       </div>
 
       {/* Configuration & Sequencing Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="schedule-config-section grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Column 1 & 2: Category Order & Sequencing */}
         <div className="lg:col-span-2 glass-panel p-5 rounded-2xl border border-slate-800 space-y-4">
@@ -549,64 +605,66 @@ export default function ScheduleManager({
               Nenhuma categoria cadastrada no momento. Crie categorias para programar o torneio.
             </div>
           ) : (
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {categorySummaries.map((item, index) => {
                 const isFirst = index === 0;
                 const isLast = index === categorySummaries.length - 1;
+                const catCourts = categoryCourtsConfig[item.category.id];
+                const isAllCourts = !catCourts || catCourts === 'ALL';
 
                 return (
                   <div
                     key={item.category.id}
-                    className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition-all space-y-2.5"
                   >
-                    {/* Position and Category Info */}
-                    <div className="flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center font-display font-extrabold text-sm flex-shrink-0">
-                        {index + 1}º
-                      </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      {/* Position and Category Info */}
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center font-display font-extrabold text-sm flex-shrink-0">
+                          {index + 1}º
+                        </div>
 
-                      <div className="flex items-center gap-2.5">
-                        <span 
-                          className="w-3 h-3 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: item.category.color || '#F59E0B' }}
-                        />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-white text-sm">
-                              {item.category.name}
-                            </h4>
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                              {item.category.shortName}
-                            </span>
-                            {item.hasRealBracket && (
-                              <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                                Chave Ativa
+                        <div className="flex items-center gap-2.5">
+                          <span 
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: item.category.color || '#F59E0B' }}
+                          />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-white text-sm">
+                                {item.category.name}
+                              </h4>
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                                {item.category.shortName}
                               </span>
-                            )}
+                              {item.hasRealBracket && (
+                                <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                  Chave Ativa
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              {item.teamsCount} duplas inscritas • ~{item.matchesCount} partidas estimadas
+                            </p>
                           </div>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            {item.teamsCount} duplas inscritas • ~{item.matchesCount} partidas estimadas
-                          </p>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Estimated Times & Reorder Controls */}
-                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60">
-                      <div className="text-left sm:text-right">
-                        <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-amber-400">
-                          <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{item.startTimeFormatted}</span>
-                          <span className="text-slate-500">➔</span>
-                          <span className="text-emerald-400">{item.endTimeFormatted}</span>
+                      {/* Estimated Times & Reorder Controls */}
+                      <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60">
+                        <div className="text-left sm:text-right">
+                          <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-amber-400">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{item.startTimeFormatted}</span>
+                            <span className="text-slate-500">➔</span>
+                            <span className="text-emerald-400">{item.endTimeFormatted}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 block">
+                            Duração: ~{item.durationHours}h ({item.durationMins} min)
+                          </span>
                         </div>
-                        <span className="text-[10px] text-slate-500 block">
-                          Duração: ~{item.durationHours}h ({item.durationMins} min)
-                        </span>
-                      </div>
 
-                      {/* Up / Down Buttons */}
-                      {!isReadOnly && (
+                        {/* Up / Down Buttons */}
                         <div className="flex items-center gap-1 ml-2">
                           <button
                             onClick={() => moveCategory(index, -1)}
@@ -614,7 +672,7 @@ export default function ScheduleManager({
                             className={`p-1.5 rounded-lg border transition-all ${
                               isFirst 
                                 ? 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed' 
-                                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 hover:text-white'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 hover:text-white cursor-pointer active:scale-95'
                             }`}
                             title="Mover categoria para cima"
                           >
@@ -626,14 +684,57 @@ export default function ScheduleManager({
                             className={`p-1.5 rounded-lg border transition-all ${
                               isLast 
                                 ? 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed' 
-                                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 hover:text-white'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 hover:text-white cursor-pointer active:scale-95'
                             }`}
                             title="Mover categoria para baixo"
                           >
                             <ArrowDown className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                      )}
+                      </div>
+                    </div>
+
+                    {/* Definição de Quadras desta Categoria: Todas sem restrição ou específicas */}
+                    <div className="pt-2 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <span className="text-slate-400 font-semibold flex items-center gap-1 text-[11px]">
+                        <Grid className="w-3.5 h-3.5 text-amber-400" />
+                        Alocação de Quadras:
+                      </span>
+
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {/* Opção: Todas sem restrição */}
+                        <button
+                          type="button"
+                          onClick={() => handleSetCategoryCourts(item.category.id, 'ALL')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer active:scale-95 ${
+                            isAllCourts
+                              ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
+                              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                          }`}
+                        >
+                          Todas ({activeCourts.length} quadras)
+                        </button>
+
+                        {/* Quadras específicas individuais */}
+                        {activeCourts.map(c => {
+                          const isSelected = Array.isArray(catCourts) && catCourts.includes(c.id);
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => handleToggleCategoryCourt(item.category.id, c.id)}
+                              className={`px-2 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer active:scale-95 ${
+                                isSelected
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold'
+                                  : 'bg-slate-900 text-slate-500 hover:text-slate-300 border border-slate-800'
+                              }`}
+                              title={`Usar ${c.name} para ${item.category.name}`}
+                            >
+                              {c.name}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 );
@@ -662,8 +763,7 @@ export default function ScheduleManager({
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                disabled={isReadOnly}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-amber-500"
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-amber-500 cursor-pointer"
               />
             </div>
 
@@ -680,7 +780,6 @@ export default function ScheduleManager({
                 step="5"
                 value={matchDuration}
                 onChange={(e) => setMatchDuration(Number(e.target.value))}
-                disabled={isReadOnly}
                 className="w-full accent-amber-500 cursor-pointer"
               />
             </div>
@@ -698,7 +797,6 @@ export default function ScheduleManager({
                 step="1"
                 value={warmupDuration}
                 onChange={(e) => setWarmupDuration(Number(e.target.value))}
-                disabled={isReadOnly}
                 className="w-full accent-cyan-500 cursor-pointer"
               />
             </div>
@@ -716,7 +814,6 @@ export default function ScheduleManager({
                 step="1"
                 value={courtSwitchDuration}
                 onChange={(e) => setCourtSwitchDuration(Number(e.target.value))}
-                disabled={isReadOnly}
                 className="w-full accent-purple-500 cursor-pointer"
               />
             </div>
@@ -749,7 +846,6 @@ export default function ScheduleManager({
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => toggleCourt(c.id)}
-                        disabled={isReadOnly}
                         className="accent-amber-500 w-4 h-4 rounded cursor-pointer"
                       />
                     </label>
@@ -769,7 +865,6 @@ export default function ScheduleManager({
                   type="checkbox"
                   checked={lunchEnabled}
                   onChange={(e) => setLunchEnabled(e.target.checked)}
-                  disabled={isReadOnly}
                   className="accent-amber-500 w-4 h-4 cursor-pointer"
                 />
               </div>
@@ -807,10 +902,22 @@ export default function ScheduleManager({
 
       </div>
 
-      {/* Grade de Jogos / Cronograma Detalhado */}
-      <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-4">
-        {/* Table & View Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+      {/* Grade de Jogos / Cronograma Detalhado (Exclusivo para Impressão) */}
+      <div id="printable-schedule-grid" className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-4">
+
+        {/* Cabeçalho impresso exclusivo para quando sair na folha */}
+        <div className="print-only-header">
+          <h1 className="text-xl font-black uppercase tracking-wide">
+            {eventInfo?.name || 'Torneio de Futvôlei'}
+          </h1>
+          <p className="text-sm font-bold">Grade Oficial de Horários dos Jogos</p>
+          <p className="text-xs text-slate-600 mt-1">
+            Início: {overallStats.tournamentStartTime} • Término Estimado: {overallStats.tournamentEndTime} • {overallStats.totalMatches} partidas • {overallStats.courtsUsed} quadra(s)
+          </p>
+        </div>
+
+        {/* Table & View Controls (Ocultos na impressão) */}
+        <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
           <div className="flex items-center gap-2">
             <h3 className="font-bold text-lg text-white font-display flex items-center gap-2">
               <Calendar className="w-5 h-5 text-amber-400" />
