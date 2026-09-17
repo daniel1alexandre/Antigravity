@@ -93,18 +93,14 @@ export default function PaymentControl({
   }, [targetPaymentAthlete, teams]);
 
   // ==========================================
-  // FINANCIAL CALCULATIONS & METRICS (WITH EXEMPT CONTROLS)
+  // FINANCIAL CALCULATIONS & METRICS (ISENTOS SOMADOS SEPARADAMENTE)
   // ==========================================
 
-  // Inscrições (Inflow 1)
-  const totalGrossExpectedRegistrations = teams.reduce((sum, t) => {
-    const cat = categories.find(c => c.id === t.categoryId);
-    return sum + (cat ? cat.entryFee : 140);
-  }, 0);
-
   let totalCollectedRegistrations = 0;
+  let totalPendingRegistrations = 0;
   let totalAthletesCount = 0;
   let totalPaidAthletes = 0;
+  let totalPendingAthletes = 0;
   let totalExemptAthletes = 0;
   let totalExemptValue = 0;
 
@@ -114,24 +110,42 @@ export default function PaymentControl({
     const p1 = getAthletePayment(t, 1, fee);
     const p2 = getAthletePayment(t, 2, fee);
 
-    totalCollectedRegistrations += (Number(p1.amount) || 0) + (Number(p2.amount) || 0);
     totalAthletesCount += 2;
-    if (p1.status === 'PAID_FULL') totalPaidAthletes++;
-    if (p2.status === 'PAID_FULL') totalPaidAthletes++;
+
+    // Atleta 1
     if (p1.status === 'EXEMPT') {
+      // Isentos são somados separadamente para controle e não entram no geral financeiro
       totalExemptAthletes++;
       totalExemptValue += p1.fee;
+    } else if (p1.status === 'PAID_FULL') {
+      totalPaidAthletes++;
+      totalCollectedRegistrations += Number(p1.amount) || p1.fee;
+    } else {
+      totalPendingAthletes++;
+      const paid = Number(p1.amount) || 0;
+      totalCollectedRegistrations += paid;
+      totalPendingRegistrations += Math.max(0, p1.fee - paid);
     }
+
+    // Atleta 2
     if (p2.status === 'EXEMPT') {
+      // Isentos são somados separadamente para controle e não entram no geral financeiro
       totalExemptAthletes++;
       totalExemptValue += p2.fee;
+    } else if (p2.status === 'PAID_FULL') {
+      totalPaidAthletes++;
+      totalCollectedRegistrations += Number(p2.amount) || p2.fee;
+    } else {
+      totalPendingAthletes++;
+      const paid = Number(p2.amount) || 0;
+      totalCollectedRegistrations += paid;
+      totalPendingRegistrations += Math.max(0, p2.fee - paid);
     }
   });
 
-  const totalPendingAthletes = Math.max(0, totalAthletesCount - totalPaidAthletes - totalExemptAthletes);
-  // Net Expected = Gross Expected minus granted exemptions (cortesias)
-  const netExpectedRegistrations = Math.max(0, totalGrossExpectedRegistrations - totalExemptValue);
-  const totalPendingRegistrations = Math.max(0, netExpectedRegistrations - totalCollectedRegistrations);
+  // Total Geral de Inscrições Pagantes (isentos não entram na cobrança/previsão geral)
+  const totalPayingAthletesCount = totalPaidAthletes + totalPendingAthletes;
+  const totalExpectedPayingRegistrations = totalCollectedRegistrations + totalPendingRegistrations;
 
   // Patrocínios (Inflow 2)
   const totalSponsorsExpected = sponsorsList.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
@@ -147,9 +161,9 @@ export default function PaymentControl({
     .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   const totalExpensesPending = totalExpensesAmount - totalExpensesPaid;
 
-  // Balanço Consolidado
+  // Balanço Consolidado (Geral sem misturar isentos na previsão de receita)
   const totalInflowRealized = totalCollectedRegistrations + totalSponsorsReceived;
-  const totalInflowProjected = netExpectedRegistrations + totalSponsorsExpected;
+  const totalInflowProjected = totalExpectedPayingRegistrations + totalSponsorsExpected;
   const currentCashBalance = totalInflowRealized - totalExpensesPaid;
   const projectedNetProfit = totalInflowProjected - totalExpensesAmount;
 
@@ -483,13 +497,17 @@ export default function PaymentControl({
           <p className="text-2xl sm:text-3xl font-extrabold text-white font-display mt-2">
             R$ {totalCollectedRegistrations.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </p>
-          <div className="flex items-center gap-1.5 mt-2 text-xs text-emerald-400">
+          <div className="flex items-center gap-2 mt-2 text-xs text-emerald-400">
             <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>{totalPaidAthletes} pagos • <strong className="text-purple-300 font-semibold">{totalExemptAthletes} isentos</strong></span>
+            <span>{totalPaidAthletes} quitados</span>
+            <span className="text-slate-500">•</span>
+            <span className="text-purple-300 font-semibold bg-purple-500/20 px-2 py-0.5 rounded-full border border-purple-500/30">
+              {totalExemptAthletes} isenções
+            </span>
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
             {totalPendingRegistrations > 0 
-              ? `R$ ${totalPendingRegistrations.toLocaleString('pt-BR')} a receber (${totalPendingAthletes} pendentes)` 
+              ? `R$ ${totalPendingRegistrations.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} a receber (${totalPendingAthletes} pendentes)` 
               : '100% dos pagantes quitados'}
           </p>
         </div>
@@ -673,7 +691,7 @@ export default function PaymentControl({
             </div>
           </div>
 
-          {/* Audit Bar: Breakdown of Inscrições (Pagos, Isentos, Pendentes, Meta Efetiva) */}
+          {/* Audit Bar: Breakdown of Inscrições (Quitados, Isentos somados separadamente, Pendentes, Total Geral Pagantes) */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
               <span className="text-[11px] text-emerald-400 font-semibold block">Quitados ({totalPaidAthletes} atletas)</span>
@@ -682,30 +700,37 @@ export default function PaymentControl({
               </p>
             </div>
 
+            {/* Isenções somadas separadamente para controle */}
             <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-purple-300 font-semibold">Isentos / Cortesias</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-200 border border-purple-500/30">
-                  {totalExemptAthletes} atletas
+                <span className="text-[11px] text-purple-300 font-semibold">Inscrições Isentas</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-200 border border-purple-500/30 font-bold">
+                  {totalExemptAthletes} isenções
                 </span>
               </div>
               <p className="text-base font-mono font-bold text-purple-300 mt-0.5">
                 R$ {totalExemptValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
+              <span className="text-[10px] text-purple-300/70 block mt-0.5">
+                Soma para controle (fora do geral)
+              </span>
             </div>
 
             <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
-              <span className="text-[11px] text-amber-400 font-semibold block">Pendente Real ({totalPendingAthletes} atletas)</span>
+              <span className="text-[11px] text-amber-400 font-semibold block">A Receber ({totalPendingAthletes} atletas)</span>
               <p className="text-base font-mono font-bold text-amber-300 mt-0.5">
                 R$ {totalPendingRegistrations.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
             </div>
 
             <div className="p-3 rounded-xl bg-slate-900 border border-slate-700">
-              <span className="text-[11px] text-slate-400 font-semibold block">Meta Líquida Esperada</span>
+              <span className="text-[11px] text-slate-400 font-semibold block">Total Geral Pagantes</span>
               <p className="text-base font-mono font-bold text-slate-200 mt-0.5">
-                R$ {netExpectedRegistrations.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R$ {totalExpectedPayingRegistrations.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
+              <span className="text-[10px] text-slate-500 block mt-0.5">
+                {totalPayingAthletesCount} atletas pagantes
+              </span>
             </div>
           </div>
 
@@ -1286,39 +1311,20 @@ export default function PaymentControl({
               </div>
 
               <div className="space-y-3 text-sm">
-                {/* Inscrições Brutas */}
+                {/* Inscrições Previstas (Apenas Pagantes) */}
                 <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800">
                   <div>
-                    <p className="font-semibold text-white">Inscrições (Capacidade Bruta)</p>
-                    <p className="text-xs text-slate-400">{totalAthletesCount} vagas totais no torneio</p>
+                    <p className="font-semibold text-white">Inscrições Pagantes (Previsão Geral)</p>
+                    <p className="text-xs text-slate-400">{totalPayingAthletesCount} atletas pagantes ({totalPaidAthletes} pagos, {totalPendingAthletes} pendentes)</p>
                   </div>
                   <div className="text-right">
                     <p className="font-mono font-bold text-slate-300">
-                      R$ {totalGrossExpectedRegistrations.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {totalExpectedPayingRegistrations.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                 </div>
 
-                {/* Dedução de Isenções / Cortesias */}
-                <div className="flex items-center justify-between p-3 rounded-xl bg-purple-950/20 border border-purple-500/30">
-                  <div>
-                    <p className="font-semibold text-purple-200 flex items-center gap-1.5">
-                      <span>(-) Isenções / Cortesias Concedidas</span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                        {totalExemptAthletes} atletas
-                      </span>
-                    </p>
-                    <p className="text-xs text-slate-400">Atletas isentos de pagamento pela organização</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-mono font-bold text-purple-300">
-                      - R$ {totalExemptValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                    <p className="text-[10px] text-purple-400/80">cortesias</p>
-                  </div>
-                </div>
-
-                {/* Arrecadação Líquida de Inscrições */}
+                {/* Arrecadação de Inscrições em Caixa */}
                 <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800">
                   <div>
                     <p className="font-semibold text-white">Inscrições Arrecadadas (Caixa)</p>
@@ -1328,7 +1334,27 @@ export default function PaymentControl({
                     <p className="font-mono font-bold text-emerald-300">
                       R$ {totalCollectedRegistrations.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
-                    <p className="text-[11px] text-slate-500">Meta líquida: R$ {netExpectedRegistrations.toLocaleString('pt-BR')}</p>
+                    <p className="text-[11px] text-slate-500">de R$ {totalExpectedPayingRegistrations.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} previstos</p>
+                  </div>
+                </div>
+
+                {/* Bloco de Controle: Inscrições Isentadas (Somadas separadamente, não contabilizadas no geral) */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-purple-950/20 border border-purple-500/30">
+                  <div>
+                    <p className="font-semibold text-purple-200 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-purple-400" />
+                      <span>Inscrições Isentadas (Controle da Organização)</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold">
+                        {totalExemptAthletes} isenções
+                      </span>
+                    </p>
+                    <p className="text-xs text-slate-400">Somado separadamente para controle gerencial • Não contabilizado no total geral</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-mono font-bold text-purple-300">
+                      R$ {totalExemptValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-[10px] text-purple-400/80">em cortesias</p>
                   </div>
                 </div>
 
