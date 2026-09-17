@@ -48,6 +48,7 @@ export function prepareDrawAnimationSteps(drawnTeams) {
     const team2 = drawnTeams[i + 1] || null;
     steps.push({
       confronto: Math.floor(i / 2) + 1,
+      team: team1,
       team1,
       team2,
       label: `Confronto ${Math.floor(i / 2) + 1}`,

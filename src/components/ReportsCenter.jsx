@@ -421,10 +421,9 @@ export default function ReportsCenter({
                 className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none"
               >
                 <option value="ALL">Todos os Status</option>
-                <option value="PAID_FULL">Quitados (100%)</option>
-                <option value="PARTIAL">Parciais (50%)</option>
-                <option value="PENDING">Pendentes</option>
+                <option value="PAID_FULL">Pagos</option>
                 <option value="EXEMPT">Isentos</option>
+                <option value="PENDING">Pendentes</option>
               </select>
             </div>
           </div>

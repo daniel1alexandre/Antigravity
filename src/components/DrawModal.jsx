@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Shuffle, Sparkles, Trophy, Play, CheckCircle2, RefreshCw, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Shuffle, Sparkles, Trophy, Play, CheckCircle2, RefreshCw, AlertTriangle, ArrowRight, Lock, CreditCard } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { performSeededDraw, performRandomDraw, prepareDrawAnimationSteps } from '../utils/drawEngine';
 import { generateDoubleEliminationBracket } from '../utils/doubleEliminationEngine';
+import { getAthletePayment } from '../types/tournament';
 
 export default function DrawModal({ 
   isOpen, 
@@ -21,11 +22,54 @@ export default function DrawModal({
 
   if (!isOpen) return null;
 
-  const category = categories.find(c => c.id === selectedCategoryId) || categories[0];
+  const category = categories.find(c => c.id === selectedCategoryId) || categories[0] || null;
+
+  if (!category) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+        <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-md p-6 text-center space-y-4">
+          <p className="text-sm text-slate-300">Nenhuma categoria cadastrada para realizar sorteio.</p>
+          <button onClick={onClose} className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs hover:bg-slate-700">Fechar</button>
+        </div>
+      </div>
+    );
+  }
+
   const categoryTeams = teams.filter(t => t.categoryId === selectedCategoryId);
   const seededCount = categoryTeams.filter(t => t.isSeed).length;
 
+  // Strict Rule: Only allow draw if ALL athletes in this category have status PAID_FULL (Pago) or EXEMPT (Isento)
+  const unpaidAthletes = [];
+  categoryTeams.forEach(team => {
+    const p1 = getAthletePayment(team, 1, category.entryFee);
+    const p2 = getAthletePayment(team, 2, category.entryFee);
+
+    if (p1.status !== 'PAID_FULL' && p1.status !== 'EXEMPT') {
+      unpaidAthletes.push({
+        teamId: team.id,
+        teamName: team.displayName,
+        athleteName: team.player1?.name || 'Jogador 1',
+        status: p1.status,
+      });
+    }
+    if (p2.status !== 'PAID_FULL' && p2.status !== 'EXEMPT') {
+      unpaidAthletes.push({
+        teamId: team.id,
+        teamName: team.displayName,
+        athleteName: team.player2?.name || 'Jogador 2',
+        status: p2.status,
+      });
+    }
+  });
+
+  const isAllPaid = unpaidAthletes.length === 0;
+
   const handleStartDraw = () => {
+    if (!isAllPaid) {
+      alert(`Sorteio Bloqueado! Existem ${unpaidAthletes.length} atletas com pagamento não quitado nesta categoria. Só é permitido realizar o sorteio dos jogos se TODOS os atletas estiverem com o status PAGO.`);
+      return;
+    }
+
     if (categoryTeams.length < 2) {
       alert('É necessário ter pelo menos 2 duplas cadastradas nesta categoria para realizar o sorteio.');
       return;
@@ -167,6 +211,59 @@ export default function DrawModal({
                 <span>Cadastre pelo menos 2 duplas nesta categoria antes de realizar o sorteio.</span>
               </div>
             )}
+
+            {/* Strict Payment Lock Alert */}
+            {!isAllPaid && categoryTeams.length >= 2 && (
+              <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 space-y-3 animate-in fade-in">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-rose-500/20 text-rose-400 mt-0.5">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-bold text-rose-300">
+                      Sorteio Bloqueado: Pagamento Obrigatório
+                    </h4>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Só é permitido realizar o sorteio dos confrontos se <strong>todos os atletas</strong> da categoria estiverem com o status <strong>Pago</strong>.
+                    </p>
+                    <p className="text-xs text-rose-400 font-semibold mt-2">
+                      {unpaidAthletes.length} {unpaidAthletes.length === 1 ? 'atleta com pendência' : 'atletas com pendência'}:
+                    </p>
+
+                    <div className="mt-2 max-h-36 overflow-y-auto space-y-1.5 pr-1 no-scrollbar">
+                      {unpaidAthletes.map((ua, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-[11px] py-1 px-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+                          <span className="text-white font-medium">
+                            {ua.athleteName} <span className="text-slate-400">({ua.teamName})</span>
+                          </span>
+                          <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${
+                            ua.status === 'EXEMPT' 
+                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
+                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          }`}>
+                            {ua.status === 'EXEMPT' ? 'Isento (Requer Pago)' : 'Pendente'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-rose-500/20 flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      setActiveTab('payments');
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs shadow-md transition-all active:scale-95"
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    Ir para o Financeiro Regularizar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -187,41 +284,51 @@ export default function DrawModal({
                   </>
                 )}
               </span>
-              <span className="text-xs font-mono text-slate-400">
-                {Math.min(currentStepIndex, animationSteps.length)} de {animationSteps.length} jogos revelados
-              </span>
             </div>
 
-            {/* Revealed Confrontations Grid */}
-            <div className="max-h-72 overflow-y-auto space-y-2.5 pr-1">
-              {animationSteps.slice(0, currentStepIndex).map((step, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-3 animate-in slide-in-from-bottom-2 duration-300"
-                >
-                  <span className="text-[11px] font-mono font-bold px-2 py-1 rounded bg-slate-800 text-amber-400 border border-slate-700">
-                    JOGO {idx + 1}
-                  </span>
-
-                  <div className="flex-1 flex items-center justify-between text-xs sm:text-sm font-bold gap-2">
-                    <div className="text-right flex-1 truncate">
-                      <span className="text-white">{step.team1?.displayName || 'Folga (BYE)'}</span>
-                      {step.team1?.isSeed && (
-                        <span className="ml-1 text-[10px] text-amber-400 font-normal">#{step.team1.seedRank}</span>
-                      )}
+            {/* List of matches or groups being revealed */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 overflow-y-auto pr-1">
+              {animationSteps.slice(0, currentStepIndex).map((stepItem, idx) => {
+                const t1 = stepItem?.team1 || stepItem?.team;
+                const t2 = stepItem?.team2;
+                return (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col gap-1.5 animate-in zoom-in-95 duration-200 shadow-lg"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-1">
+                      <span className="font-mono text-[10px] font-black tracking-wider text-amber-400">
+                        CONFRONTO #{stepItem?.confronto || (idx + 1)}
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Sorteado
+                      </span>
                     </div>
 
-                    <span className="text-amber-500 font-extrabold text-xs px-1.5">VS</span>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs font-bold text-white">
+                        <span className="truncate max-w-[180px]">{t1?.displayName || 'Aguardando'}</span>
+                        {t1?.isSeed && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                            Seed #{t1.seedRank}
+                          </span>
+                        )}
+                      </div>
 
-                    <div className="text-left flex-1 truncate">
-                      <span className="text-white">{step.team2?.displayName || 'Folga (BYE)'}</span>
-                      {step.team2?.isSeed && (
-                        <span className="ml-1 text-[10px] text-amber-400 font-normal">#{step.team2.seedRank}</span>
-                      )}
+                      <div className="text-[9px] font-black text-amber-400/80 text-center tracking-widest">VS</div>
+
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+                        <span className="truncate max-w-[180px]">{t2 ? t2.displayName : 'FOLGA (BYE)'}</span>
+                        {t2?.isSeed && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                            Seed #{t2.seedRank}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -239,12 +346,22 @@ export default function DrawModal({
               </button>
               <button
                 type="button"
-                disabled={categoryTeams.length < 2 || isDrawing}
+                disabled={categoryTeams.length < 2 || isDrawing || !isAllPaid}
                 onClick={handleStartDraw}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-slate-950 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 shadow-glow-amber transition-all transform hover:scale-105"
+                title={!isAllPaid ? 'Bloqueado: regularize o pagamento de todos os atletas antes de sortear' : 'Iniciar Sorteio'}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-slate-950 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed shadow-glow-amber transition-all transform hover:scale-105 active:scale-95"
               >
-                <Play className="w-4 h-4 fill-current" />
-                Iniciar Sorteio Ao Vivo
+                {!isAllPaid ? (
+                  <>
+                    <Lock className="w-4 h-4 text-slate-950" />
+                    Sorteio Bloqueado
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 fill-current" />
+                    Iniciar Sorteio Ao Vivo
+                  </>
+                )}
               </button>
             </>
           ) : (

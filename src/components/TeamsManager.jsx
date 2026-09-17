@@ -28,13 +28,15 @@ import { PAYMENT_STATUS, SHIRT_SIZES, getAthletePayment } from '../types/tournam
 export default function TeamsManager({ 
   teams, 
   setTeams, 
-  categories, 
+  categories = [], 
   selectedCategoryId, 
   setSelectedCategoryId,
   isAddModalOpen,
   setIsAddModalOpen,
   eventInfo,
-  onGoToPayments 
+  onGoToPayments,
+  onGoToCategories,
+  isReadOnly = false
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('ALL');
@@ -63,13 +65,18 @@ export default function TeamsManager({
     paymentNotes: '',
   });
 
-  const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
+  const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0] || null;
 
   // Open modal for Create
   const handleOpenCreate = () => {
+    if (categories.length === 0) {
+      alert('Cadastre ao menos uma categoria antes de adicionar duplas.');
+      if (onGoToCategories) onGoToCategories();
+      return;
+    }
     setEditingTeam(null);
     setFormData({
-      categoryId: selectedCategoryId,
+      categoryId: selectedCategoryId || categories[0]?.id || '',
       player1Name: '',
       player1Nickname: '',
       player1Phone: '',
@@ -139,7 +146,7 @@ export default function TeamsManager({
             seedRank: formData.isSeed && formData.seedRank ? Number(formData.seedRank) : null,
             paymentStatus: formData.paymentStatus,
             paymentMethod: formData.paymentMethod,
-            paidAmount: Number(formData.paidAmount || 0),
+            paidAmount: formData.paymentStatus === 'EXEMPT' ? 0 : Number(formData.paidAmount || 0),
             paymentNotes: formData.paymentNotes,
             player1: {
               name: formData.player1Name,
@@ -147,6 +154,7 @@ export default function TeamsManager({
               phone: formData.player1Phone,
               instagram: formData.player1Instagram,
               shirtSize: formData.player1ShirtSize,
+              payment: formData.paymentStatus === 'EXEMPT' ? { status: 'EXEMPT', amount: 0 } : (t.player1?.payment || null),
             },
             player2: {
               name: formData.player2Name,
@@ -154,6 +162,7 @@ export default function TeamsManager({
               phone: formData.player2Phone,
               instagram: formData.player2Instagram,
               shirtSize: formData.player2ShirtSize,
+              payment: formData.paymentStatus === 'EXEMPT' ? { status: 'EXEMPT', amount: 0 } : (t.player2?.payment || null),
             },
           };
         }
@@ -161,6 +170,9 @@ export default function TeamsManager({
       }));
     } else {
       const cat = categories.find(c => c.id === formData.categoryId) || selectedCategory;
+      const isExempt = formData.paymentStatus === 'EXEMPT';
+      const initialPaid = isExempt ? 0 : (formData.paymentStatus === 'PAID_FULL' ? (Number(formData.paidAmount) || (cat ? cat.entryFee : 140)) : Number(formData.paidAmount || 0));
+
       const newTeam = {
         id: `team-${Date.now()}`,
         categoryId: formData.categoryId,
@@ -170,7 +182,7 @@ export default function TeamsManager({
         seedRank: formData.isSeed && formData.seedRank ? Number(formData.seedRank) : null,
         paymentStatus: formData.paymentStatus,
         paymentMethod: formData.paymentMethod,
-        paidAmount: formData.paymentStatus === 'PAID_FULL' ? (Number(formData.paidAmount) || cat.entryFee) : Number(formData.paidAmount || 0),
+        paidAmount: initialPaid,
         paymentNotes: formData.paymentNotes,
         createdAt: new Date().toISOString(),
         player1: {
@@ -215,8 +227,43 @@ export default function TeamsManager({
     } : t));
   };
 
-  // Filtered Teams
+  // Filtered Teams & Individual Athlete Metrics
   const categoryTeams = teams.filter(t => t.categoryId === selectedCategoryId);
+  const selectedCatFee = selectedCategory?.entryFee || 140;
+
+  let totalAthletesCount = 0;
+  let paidAthletesCount = 0;
+  let exemptAthletesCount = 0;
+  let pendingAthletesCount = 0;
+
+  let paidTeamsCount = 0;
+  let exemptTeamsCount = 0;
+  let pendingTeamsCount = 0;
+
+  categoryTeams.forEach(t => {
+    const fee = selectedCatFee;
+    const p1 = getAthletePayment(t, 1, fee);
+    const p2 = getAthletePayment(t, 2, fee);
+
+    totalAthletesCount += 2;
+
+    if (p1.status === 'PAID_FULL') paidAthletesCount++;
+    else if (p1.status === 'EXEMPT') exemptAthletesCount++;
+    else pendingAthletesCount++;
+
+    if (p2.status === 'PAID_FULL') paidAthletesCount++;
+    else if (p2.status === 'EXEMPT') exemptAthletesCount++;
+    else pendingAthletesCount++;
+
+    if (t.paymentStatus === 'PAID_FULL' || (p1.status === 'PAID_FULL' && p2.status === 'PAID_FULL')) {
+      paidTeamsCount++;
+    } else if (t.paymentStatus === 'EXEMPT' || (p1.status === 'EXEMPT' && p2.status === 'EXEMPT')) {
+      exemptTeamsCount++;
+    } else {
+      pendingTeamsCount++;
+    }
+  });
+
   const filteredTeams = categoryTeams.filter(team => {
     const matchesSearch = 
       team.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -226,14 +273,54 @@ export default function TeamsManager({
       team.player2?.nickname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       team.city?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesPayment = paymentFilter === 'ALL' ? true : team.paymentStatus === paymentFilter;
+    if (!matchesSearch) return false;
 
-    return matchesSearch && matchesPayment;
+    if (paymentFilter === 'ALL') return true;
+    
+    const fee = selectedCatFee;
+    const p1 = getAthletePayment(team, 1, fee);
+    const p2 = getAthletePayment(team, 2, fee);
+
+    if (paymentFilter === 'PAID_FULL') {
+      return team.paymentStatus === 'PAID_FULL' || p1.status === 'PAID_FULL' || p2.status === 'PAID_FULL';
+    }
+    if (paymentFilter === 'EXEMPT') {
+      return team.paymentStatus === 'EXEMPT' || p1.status === 'EXEMPT' || p2.status === 'EXEMPT';
+    }
+    if (paymentFilter === 'PENDING') {
+      return team.paymentStatus === 'PENDING' || p1.status === 'PENDING' || p2.status === 'PENDING';
+    }
+    return true;
   });
+
+  if (categories.length === 0) {
+    return (
+      <div className="glass-panel p-8 sm:p-12 rounded-3xl text-center max-w-xl mx-auto my-8 border border-amber-500/30 space-y-6 animate-in fade-in duration-300">
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto shadow-glow-amber">
+          <Users className="w-8 h-8" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold font-display text-white">Torneio Criado do Zero!</h2>
+          <p className="text-sm text-slate-400 leading-relaxed">
+            Nenhuma categoria cadastrada ainda. Para começar a cadastrar as duplas e gerar as chaves, crie a primeira categoria do seu evento esportivo.
+          </p>
+        </div>
+        <div>
+          <button
+            onClick={onGoToCategories}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-purple-500/20 transition-all transform hover:scale-105 active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            Cadastrar Primeira Categoria
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Category Banner & Summary */}
+      {/* Category Banner & Quick Actions */}
       <div className="glass-panel p-6 rounded-2xl relative overflow-hidden">
         <div 
           className="absolute -right-20 -top-20 w-64 h-64 rounded-full blur-3xl opacity-20 pointer-events-none"
@@ -248,32 +335,33 @@ export default function TeamsManager({
                 style={{ backgroundColor: selectedCategory?.color || '#F59E0B' }}
               />
               <h2 className="text-2xl font-bold font-display text-white">
-                {selectedCategory?.name}
+                {selectedCategory?.name || 'Categoria'}
               </h2>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-amber-400 border border-slate-700">
                 {categoryTeams.length} {categoryTeams.length === 1 ? 'dupla cadastrada' : 'duplas cadastradas'}
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-400 mt-1">
-              Inscrição: <strong className="text-emerald-400">R$ {selectedCategory?.entryFee}</strong> • Regra: Set até <strong className="text-amber-300">{selectedCategory?.pointsToWin} pts</strong> (+2)
+              Inscrição: <strong className="text-emerald-400">R$ {selectedCategory?.entryFee ?? 0}</strong> • Regra: Set até <strong className="text-amber-300">{selectedCategory?.pointsToWin ?? 18} pts</strong> (+2)
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleOpenCreate}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-glow-amber transition-all transform hover:scale-105 active:scale-95"
-            >
-              <Plus className="w-4 h-4 text-slate-950" />
-              Cadastrar Dupla
-            </button>
+            {!isReadOnly && (
+              <button
+                onClick={handleOpenCreate}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-glow-amber transition-all transform hover:scale-105 active:scale-95"
+              >
+                <Plus className="w-4 h-4 text-slate-950" />
+                Cadastrar Dupla
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Filter Controls Bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6 pt-5 border-t border-slate-800">
-          {/* Search Box */}
-          <div className="relative w-full sm:w-72">
+        {/* Search Input Bar */}
+        <div className="mt-5 pt-4 border-t border-slate-800 flex items-center justify-between gap-4">
+          <div className="relative w-full sm:w-80">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -283,39 +371,127 @@ export default function TeamsManager({
               className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
             />
           </div>
+          <div className="text-xs text-slate-400 hidden sm:block">
+            Mostrando <strong>{filteredTeams.length}</strong> de <strong>{categoryTeams.length}</strong> duplas
+          </div>
+        </div>
+      </div>
 
-          {/* Payment Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
-            <button
-              onClick={() => setPaymentFilter('ALL')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                paymentFilter === 'ALL'
-                  ? 'bg-amber-500 text-slate-950'
-                  : 'bg-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              Todos ({categoryTeams.length})
-            </button>
-            <button
-              onClick={() => setPaymentFilter('PAID_FULL')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                paymentFilter === 'PAID_FULL'
-                  ? 'bg-emerald-500 text-slate-950 font-bold'
-                  : 'bg-slate-800 text-emerald-400/80 hover:text-emerald-300'
-              }`}
-            >
-              Pagos ({categoryTeams.filter(t => t.paymentStatus === 'PAID_FULL').length})
-            </button>
-            <button
-              onClick={() => setPaymentFilter('PENDING')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                paymentFilter === 'PENDING'
-                  ? 'bg-amber-500 text-slate-950 font-bold'
-                  : 'bg-slate-800 text-amber-400/80 hover:text-amber-300'
-              }`}
-            >
-              Pendentes ({categoryTeams.filter(t => t.paymentStatus === 'PENDING').length})
-            </button>
+      {/* 4 Interactive Summary Cards for Athletes (Todos, Pagos, Isentos, Pendentes) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Todos os Atletas */}
+        <div 
+          onClick={() => setPaymentFilter('ALL')}
+          className={`glass-panel p-4 rounded-2xl border transition-all cursor-pointer transform hover:-translate-y-0.5 ${
+            paymentFilter === 'ALL'
+              ? 'border-amber-500/80 bg-amber-500/10 shadow-glow-amber ring-2 ring-amber-500/40'
+              : 'border-slate-800/80 hover:border-slate-700 bg-slate-950/40'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-300">TODOS OS ATLETAS</span>
+            <div className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-amber-400">
+              <Users className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black font-display text-white">
+              {totalAthletesCount}
+            </span>
+            <span className="text-xs text-slate-400">atletas</span>
+          </div>
+          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800/80">
+            <span>{categoryTeams.length} duplas</span>
+            <span className={`font-semibold ${paymentFilter === 'ALL' ? 'text-amber-400' : 'text-slate-500'}`}>
+              {paymentFilter === 'ALL' ? '● Exibindo todos' : 'Filtrar todos'}
+            </span>
+          </div>
+        </div>
+
+        {/* Card 2: Pagos */}
+        <div 
+          onClick={() => setPaymentFilter('PAID_FULL')}
+          className={`glass-panel p-4 rounded-2xl border transition-all cursor-pointer transform hover:-translate-y-0.5 ${
+            paymentFilter === 'PAID_FULL'
+              ? 'border-emerald-500/80 bg-emerald-500/10 shadow-glow-emerald ring-2 ring-emerald-500/40'
+              : 'border-slate-800/80 hover:border-slate-700 bg-slate-950/40'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-emerald-400">ATLETAS PAGOS</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-950/60 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black font-display text-emerald-400">
+              {paidAthletesCount}
+            </span>
+            <span className="text-xs text-slate-400">atletas</span>
+          </div>
+          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800/80">
+            <span>{paidTeamsCount} duplas quitadas</span>
+            <span className={`font-semibold ${paymentFilter === 'PAID_FULL' ? 'text-emerald-400' : 'text-slate-500'}`}>
+              {paymentFilter === 'PAID_FULL' ? '● Filtrado' : 'Filtrar'}
+            </span>
+          </div>
+        </div>
+
+        {/* Card 3: Isentos (Não Cobrar) */}
+        <div 
+          onClick={() => setPaymentFilter('EXEMPT')}
+          className={`glass-panel p-4 rounded-2xl border transition-all cursor-pointer transform hover:-translate-y-0.5 ${
+            paymentFilter === 'EXEMPT'
+              ? 'border-purple-500/80 bg-purple-500/10 shadow-glow-purple ring-2 ring-purple-500/40'
+              : 'border-slate-800/80 hover:border-slate-700 bg-slate-950/40'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-purple-400">ATLETAS ISENTOS</span>
+            <div className="w-8 h-8 rounded-xl bg-purple-950/60 border border-purple-500/40 flex items-center justify-center text-purple-400">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black font-display text-purple-300">
+              {exemptAthletesCount}
+            </span>
+            <span className="text-xs text-slate-400">atletas</span>
+          </div>
+          <div className="mt-2 flex items-center justify-between text-[11px] text-purple-300/80 pt-2 border-t border-slate-800/80">
+            <span className="font-bold text-purple-400">Não Cobrar (R$ 0,00)</span>
+            <span className={`font-semibold ${paymentFilter === 'EXEMPT' ? 'text-purple-300' : 'text-slate-500'}`}>
+              {paymentFilter === 'EXEMPT' ? '● Filtrado' : 'Filtrar'}
+            </span>
+          </div>
+        </div>
+
+        {/* Card 4: Pendentes */}
+        <div 
+          onClick={() => setPaymentFilter('PENDING')}
+          className={`glass-panel p-4 rounded-2xl border transition-all cursor-pointer transform hover:-translate-y-0.5 ${
+            paymentFilter === 'PENDING'
+              ? 'border-rose-500/80 bg-rose-500/10 shadow-glow-rose ring-2 ring-rose-500/40'
+              : 'border-slate-800/80 hover:border-slate-700 bg-slate-950/40'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-rose-400">ATLETAS PENDENTES</span>
+            <div className="w-8 h-8 rounded-xl bg-rose-950/60 border border-rose-500/40 flex items-center justify-center text-rose-400">
+              <AlertCircle className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black font-display text-rose-400">
+              {pendingAthletesCount}
+            </span>
+            <span className="text-xs text-slate-400">atletas</span>
+          </div>
+          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800/80">
+            <span>{pendingTeamsCount} duplas c/ pendência</span>
+            <span className={`font-semibold ${paymentFilter === 'PENDING' ? 'text-rose-400' : 'text-slate-500'}`}>
+              {paymentFilter === 'PENDING' ? '● Filtrado' : 'Filtrar'}
+            </span>
           </div>
         </div>
       </div>
@@ -330,12 +506,14 @@ export default function TeamsManager({
               ? 'Tente ajustar os termos da busca ou filtros selecionados.'
               : 'Clique em "Cadastrar Dupla" para adicionar atletas nesta categoria.'}
           </p>
-          <button
-            onClick={handleOpenCreate}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-glow-amber transition-all"
-          >
-            <Plus className="w-4 h-4" /> Cadastrar 1ª Dupla
-          </button>
+          {!isReadOnly && (
+            <button
+              onClick={handleOpenCreate}
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-glow-amber transition-all"
+            >
+              <Plus className="w-4 h-4" /> Cadastrar 1ª Dupla
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -350,7 +528,7 @@ export default function TeamsManager({
               <div
                 key={team.id}
                 onClick={() => onGoToPayments && onGoToPayments(team.id, 1)}
-                title="Clique para abrir o Controle Financeiro desta dupla"
+                title="Clique para abrir o Financeiro desta dupla"
                 className="glass-card rounded-2xl p-5 relative overflow-hidden group flex flex-col justify-between border border-slate-800/80 hover:border-emerald-500/50 hover:shadow-glow-emerald transition-all duration-300 shadow-lg cursor-pointer transform hover:-translate-y-1"
               >
                 {/* Seed Badge */}
@@ -407,18 +585,14 @@ export default function TeamsManager({
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border ${
                             p1Pay.status === 'PAID_FULL' 
                               ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                              : p1Pay.status === 'PAID_HALF'
-                              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
                               : p1Pay.status === 'EXEMPT'
                               ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
                               : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
                           }`}>
                             {p1Pay.status === 'PAID_FULL' ? (
                               <><CheckCircle2 className="w-3 h-3 text-emerald-400" /> Pago (R$ {p1Pay.amount})</>
-                            ) : p1Pay.status === 'PAID_HALF' ? (
-                              <><Clock className="w-3 h-3 text-cyan-400" /> 50% (R$ {p1Pay.amount})</>
                             ) : p1Pay.status === 'EXEMPT' ? (
-                              <span>Isento</span>
+                              <><ShieldCheck className="w-3 h-3 text-purple-400" /> Isento (R$ 0,00 • Não Cobrar)</>
                             ) : (
                               <><Clock className="w-3 h-3 text-amber-400" /> Pendente</>
                             )}
@@ -479,8 +653,6 @@ export default function TeamsManager({
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border ${
                             p2Pay.status === 'PAID_FULL' 
                               ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                              : p2Pay.status === 'PAID_HALF'
-                              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
                               : p2Pay.status === 'EXEMPT'
                               ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
                               : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
@@ -490,7 +662,7 @@ export default function TeamsManager({
                             ) : p2Pay.status === 'PAID_HALF' ? (
                               <><Clock className="w-3 h-3 text-cyan-400" /> 50% (R$ {p2Pay.amount})</>
                             ) : p2Pay.status === 'EXEMPT' ? (
-                              <span>Isento</span>
+                              <><ShieldCheck className="w-3 h-3 text-purple-400" /> Isento (R$ 0,00 • Não Cobrar)</>
                             ) : (
                               <><Clock className="w-3 h-3 text-amber-400" /> Pendente</>
                             )}
@@ -535,7 +707,7 @@ export default function TeamsManager({
                 >
                   <button
                     onClick={() => onGoToPayments && onGoToPayments(team.id, 1)}
-                    title="Ir para o Controle Financeiro desta dupla"
+                    title="Ir para o Financeiro desta dupla"
                     className="px-2.5 py-1.5 rounded-lg text-xs font-bold border flex items-center gap-1.5 transition-all bg-slate-900 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20 active:scale-95"
                   >
                     <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
@@ -749,16 +921,30 @@ export default function TeamsManager({
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Status Pagamento</label>
                   <select
                     value={formData.paymentStatus}
-                    onChange={(e) => setFormData({ ...formData, paymentStatus: e.target.value })}
+                    onChange={(e) => {
+                      const newStatus = e.target.value;
+                      setFormData({ 
+                        ...formData, 
+                        paymentStatus: newStatus,
+                        paidAmount: newStatus === 'EXEMPT' ? 0 : formData.paidAmount
+                      });
+                    }}
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
                   >
                     <option value="PENDING">Pendente</option>
-                    <option value="PAID_FULL">Pago (100%)</option>
-                    <option value="PAID_HALF">Pago (50%)</option>
-                    <option value="EXEMPT">Isento / Cortesia</option>
+                    <option value="PAID_FULL">Pago</option>
+                    <option value="EXEMPT">Isento (Não cobrar)</option>
                   </select>
                 </div>
               </div>
+
+              {/* Notice when EXEMPT */}
+              {formData.paymentStatus === 'EXEMPT' && (
+                <div className="p-3 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                  <span><strong>Isenção Aplicada:</strong> Dupla isenta da taxa de inscrição. Valor fixado em <strong>R$ 0,00 (Não cobrar)</strong>.</span>
+                </div>
+              )}
 
               {/* Seed toggle */}
               <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between">

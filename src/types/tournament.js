@@ -1,8 +1,7 @@
 export const PAYMENT_STATUS = {
+  PAID_FULL: { label: 'Pago', value: 'PAID_FULL', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
+  EXEMPT: { label: 'Isento', value: 'EXEMPT', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
   PENDING: { label: 'Pendente', value: 'PENDING', color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
-  PAID_FULL: { label: 'Pago (100%)', value: 'PAID_FULL', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
-  PAID_HALF: { label: 'Pago (50%)', value: 'PAID_HALF', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' },
-  EXEMPT: { label: 'Isento / Cortesia', value: 'EXEMPT', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
 };
 
 export const PAYMENT_METHODS = {
@@ -100,13 +99,14 @@ export function getAthletePayment(team, playerNum, entryFee) {
   const athleteFee = Math.round((entryFee || 140) / 2);
 
   if (player?.payment) {
+    const isExempt = player.payment.status === 'EXEMPT';
     return {
       status: player.payment.status || 'PENDING',
       method: player.payment.method || team?.paymentMethod || 'PIX',
-      amount: Number(player.payment.amount !== undefined ? player.payment.amount : 0),
+      amount: isExempt ? 0 : Number(player.payment.amount !== undefined ? player.payment.amount : 0),
       date: player.payment.date || null,
       notes: player.payment.notes || '',
-      fee: athleteFee,
+      fee: isExempt ? 0 : athleteFee,
     };
   }
 
@@ -116,18 +116,12 @@ export function getAthletePayment(team, playerNum, entryFee) {
   if (team?.paymentStatus === 'PAID_FULL') {
     derivedStatus = 'PAID_FULL';
     derivedAmount = athleteFee;
-  } else if (team?.paymentStatus === 'PAID_HALF') {
-    if (playerNum === 1) {
-      derivedStatus = 'PAID_FULL';
-      derivedAmount = athleteFee;
-    } else {
-      derivedStatus = 'PENDING';
-      derivedAmount = 0;
-    }
   } else if (team?.paymentStatus === 'EXEMPT') {
     derivedStatus = 'EXEMPT';
     derivedAmount = 0;
   }
+
+  const isExempt = derivedStatus === 'EXEMPT';
 
   return {
     status: derivedStatus,
@@ -135,6 +129,6 @@ export function getAthletePayment(team, playerNum, entryFee) {
     amount: derivedAmount,
     date: team?.paymentDate || null,
     notes: team?.paymentNotes || '',
-    fee: athleteFee,
+    fee: isExempt ? 0 : athleteFee,
   };
 }

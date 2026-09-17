@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
 import { Layers, Plus, Edit2, Trash2, CheckCircle2, DollarSign, Users, Award, Shield } from 'lucide-react';
 
-export default function CategoryManager({ categories, setCategories, teams, selectedCategoryId, setSelectedCategoryId }) {
+export default function CategoryManager({ 
+  categories, 
+  setCategories, 
+  teams, 
+  selectedCategoryId, 
+  setSelectedCategoryId,
+  isReadOnly = false
+}) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
 
@@ -73,10 +80,6 @@ export default function CategoryManager({ categories, setCategories, teams, sele
       alert(`Não é possível excluir: existem ${teamsInCat.length} duplas cadastradas nesta categoria. Remova ou transfira as duplas primeiro.`);
       return;
     }
-    if (categories.length <= 1) {
-      alert('Você deve manter pelo menos uma categoria cadastrada.');
-      return;
-    }
     if (window.confirm('Tem certeza que deseja excluir esta categoria?')) {
       const updated = categories.filter(c => c.id !== catId);
       setCategories(updated);
@@ -108,17 +111,41 @@ export default function CategoryManager({ categories, setCategories, teams, sele
             Configure as categorias, valores de inscrição e regras de pontuação para o chaveamento.
           </p>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-purple-500/20 transition-all active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
-          Nova Categoria
-        </button>
+        {!isReadOnly && (
+          <button
+            onClick={openCreateModal}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-purple-500/20 transition-all active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            Nova Categoria
+          </button>
+        )}
       </div>
 
-      {/* Grid of Categories */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      {/* Grid of Categories or Empty State */}
+      {categories.length === 0 ? (
+        <div className="glass-panel p-12 rounded-3xl text-center space-y-4 max-w-xl mx-auto border border-purple-500/20">
+          <div className="w-14 h-14 rounded-2xl bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center mx-auto">
+            <Layers className="w-7 h-7" />
+          </div>
+          <h3 className="text-xl font-bold text-white font-display">Nenhuma categoria cadastrada</h3>
+          <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto">
+            Cadastre as categorias para este torneio (por exemplo: Iniciante, Intermediário, C/D ou Open), com as regras de pontos e valor de inscrição.
+          </p>
+          {!isReadOnly && (
+            <div>
+              <button
+                onClick={openCreateModal}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-purple-500/20 transition-all active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                Cadastrar 1ª Categoria
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {categories.map((cat) => {
           const categoryTeams = teams.filter(t => t.categoryId === cat.id);
           const paidTeams = categoryTeams.filter(t => t.paymentStatus === 'PAID_FULL');
@@ -152,22 +179,24 @@ export default function CategoryManager({ categories, setCategories, teams, sele
                   </span>
                 </div>
 
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => openEditModal(cat)}
-                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-                    title="Editar Categoria"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(cat.id)}
-                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-300 transition-colors"
-                    title="Excluir Categoria"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                {!isReadOnly && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => openEditModal(cat)}
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                      title="Editar Categoria"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(cat.id)}
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-400 transition-colors"
+                      title="Excluir Categoria"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {cat.description && (
@@ -228,6 +257,7 @@ export default function CategoryManager({ categories, setCategories, teams, sele
           );
         })}
       </div>
+      )}
 
       {/* Modal Create / Edit */}
       {isModalOpen && (

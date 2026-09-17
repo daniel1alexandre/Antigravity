@@ -12,14 +12,27 @@ const STORAGE_KEYS = {
 
 export function loadTournamentData() {
   try {
-    const eventInfo = JSON.parse(localStorage.getItem(STORAGE_KEYS.EVENT_INFO)) || INITIAL_EVENT_INFO;
+    const rawEventInfo = localStorage.getItem(STORAGE_KEYS.EVENT_INFO);
+    let eventInfo = rawEventInfo !== null ? JSON.parse(rawEventInfo) : INITIAL_EVENT_INFO;
     // Migrate: ensure courts array exists
     if (!eventInfo.courts || !Array.isArray(eventInfo.courts)) {
       eventInfo.courts = DEFAULT_COURTS;
     }
-    const categories = JSON.parse(localStorage.getItem(STORAGE_KEYS.CATEGORIES)) || DEFAULT_CATEGORIES;
-    const teams = JSON.parse(localStorage.getItem(STORAGE_KEYS.TEAMS)) || MOCK_TEAMS;
-    const brackets = JSON.parse(localStorage.getItem(STORAGE_KEYS.BRACKETS)) || {};
+    if (!eventInfo.expenses || !Array.isArray(eventInfo.expenses)) {
+      eventInfo.expenses = [];
+    }
+    if (!eventInfo.sponsors || !Array.isArray(eventInfo.sponsors)) {
+      eventInfo.sponsors = [];
+    }
+
+    const rawCategories = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
+    const categories = rawCategories !== null ? JSON.parse(rawCategories) : DEFAULT_CATEGORIES;
+
+    const rawTeams = localStorage.getItem(STORAGE_KEYS.TEAMS);
+    const teams = rawTeams !== null ? JSON.parse(rawTeams) : MOCK_TEAMS;
+
+    const rawBrackets = localStorage.getItem(STORAGE_KEYS.BRACKETS);
+    const brackets = rawBrackets !== null ? JSON.parse(rawBrackets) : {};
 
     return {
       eventInfo,
@@ -36,6 +49,35 @@ export function loadTournamentData() {
       brackets: {},
     };
   }
+}
+
+export function createNewTournament(customInfo = {}) {
+  const newEventInfo = {
+    name: customInfo.name?.trim() || 'Novo Torneio de Futvôlei',
+    organizer: customInfo.organizer?.trim() || '',
+    location: customInfo.location?.trim() || '',
+    date: customInfo.date?.trim() || '',
+    courts: DEFAULT_COURTS,
+    pixKey: '',
+    pixReceiver: '',
+    pixBank: '',
+    defaultEntryFee: 140,
+    expenses: [],
+    sponsors: [],
+    ...customInfo,
+  };
+
+  localStorage.setItem(STORAGE_KEYS.EVENT_INFO, JSON.stringify(newEventInfo));
+  localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify([]));
+  localStorage.setItem(STORAGE_KEYS.TEAMS, JSON.stringify([]));
+  localStorage.setItem(STORAGE_KEYS.BRACKETS, JSON.stringify({}));
+
+  return {
+    eventInfo: newEventInfo,
+    categories: [],
+    teams: [],
+    brackets: {},
+  };
 }
 
 export function saveTournamentData(data) {

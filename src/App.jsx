@@ -11,11 +11,22 @@ import FinalStandings from './components/FinalStandings';
 import ReportsCenter from './components/ReportsCenter';
 import DrawModal from './components/DrawModal';
 import SettingsBackupModal from './components/SettingsBackupModal';
+import CreateTournamentModal from './components/CreateTournamentModal';
+import LoginScreen from './components/LoginScreen';
+import UserManagerModal from './components/UserManagerModal';
 
-import { loadTournamentData, saveTournamentData } from './utils/storage';
+import { loadTournamentData, saveTournamentData, createNewTournament } from './utils/storage';
 import { updateMatchScore } from './utils/doubleEliminationEngine';
+import { getCurrentUser, logout } from './utils/auth';
+import { Eye, Lock } from 'lucide-react';
 
 export default function App() {
+  // Authentication & Session
+  const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
+  const [isUserManagerOpen, setIsUserManagerOpen] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const isReadOnly = !currentUser;
+
   // Main State
   const [dataLoaded, setDataLoaded] = useState(false);
   const [eventInfo, setEventInfo] = useState(null);
@@ -27,6 +38,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('teams');
 
   // Modals & Overlay States
+  const [isCreateTournamentModalOpen, setIsCreateTournamentModalOpen] = useState(false);
   const [isAddTeamModalOpen, setIsAddTeamModalOpen] = useState(false);
   const [isDrawModalOpen, setIsDrawModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -79,6 +91,8 @@ export default function App() {
 
     if (loaded.categories.length > 0) {
       setSelectedCategoryId(loaded.categories[0].id);
+    } else {
+      setSelectedCategoryId('');
     }
     setDataLoaded(true);
   }, []);
@@ -94,6 +108,18 @@ export default function App() {
     });
   }, [eventInfo, categories, teams, brackets, dataLoaded]);
 
+  // Create clean tournament from scratch
+  const handleCreateNewTournament = (tournamentInfo) => {
+    const clean = createNewTournament(tournamentInfo);
+    setEventInfo(clean.eventInfo);
+    setCategories([]);
+    setTeams([]);
+    setBrackets({});
+    setSelectedCategoryId('');
+    setActiveTab('categories');
+    setIsCreateTournamentModalOpen(false);
+  };
+
   if (!dataLoaded) {
     return (
       <div className="min-h-screen bg-[#0B0F17] flex items-center justify-center text-amber-400 font-bold text-lg">
@@ -102,9 +128,9 @@ export default function App() {
     );
   }
 
-  const currentCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
-  const currentBracket = brackets[selectedCategoryId] || null;
-  const currentCategoryTeams = teams.filter(t => t.categoryId === selectedCategoryId);
+  const currentCategory = categories.find(c => c.id === selectedCategoryId) || categories[0] || null;
+  const currentBracket = selectedCategoryId ? (brackets[selectedCategoryId] || null) : null;
+  const currentCategoryTeams = selectedCategoryId ? teams.filter(t => t.categoryId === selectedCategoryId) : [];
 
   // Update Match Score & Advance Bracket (supports match from any category)
   const handleSaveScore = (matchId, score1, score2, sets, matchCategoryId) => {
@@ -128,10 +154,21 @@ export default function App() {
     }
   };
 
-  // Update Assigned Court (Disallow court if already in use)
-  const handleUpdateCourt = (matchId, court) => {
-    if (!currentBracket) return;
-    const match = currentBracket.matches[matchId];
+  // Update Assigned Court (Disallow court if already in use, supports match from any category)
+  const handleUpdateCourt = (matchId, court, matchCategoryId) => {
+    // Determine category of match
+    let targetCatId = matchCategoryId;
+    if (!targetCatId) {
+      for (const [catId, b] of Object.entries(brackets)) {
+        if (b?.matches && b.matches[matchId]) {
+          targetCatId = catId;
+          break;
+        }
+      }
+    }
+    if (!targetCatId || !brackets[targetCatId]) return;
+    const targetBracket = brackets[targetCatId];
+    const match = targetBracket.matches[matchId];
     if (!match) return;
 
     if (court) {
@@ -156,7 +193,7 @@ export default function App() {
     }
 
     const updatedMatches = {
-      ...currentBracket.matches,
+      ...targetBracket.matches,
       [matchId]: {
         ...match,
         court: court || null,
@@ -166,16 +203,22 @@ export default function App() {
 
     setBrackets({
       ...brackets,
-      [selectedCategoryId]: {
-        ...currentBracket,
+      [targetCatId]: {
+        ...targetBracket,
         matches: updatedMatches,
       },
     });
   };
 
-  // Reset category bracket
+  // Cancel category draw / Reset category bracket
   const handleResetBracket = () => {
-    if (window.confirm(`Deseja resetar a chave de Eliminatória Dupla da categoria "${currentCategory?.name}"?`)) {
+    if (isReadOnly) {
+      alert('Modo apenas visualização: faça login como administrador para cancelar o sorteio.');
+      return;
+    }
+    if (!selectedCategoryId) return;
+    const catName = currentCategory?.name || 'selecionada';
+    if (window.confirm(`Deseja realmente cancelar o sorteio da categoria "${catName}"? Todos os confrontos gerados serão cancelados para permitir um novo sorteio.`)) {
       const newBrackets = { ...brackets };
       delete newBrackets[selectedCategoryId];
       setBrackets(newBrackets);
@@ -192,15 +235,54 @@ export default function App() {
         categories={categories}
         selectedCategoryId={selectedCategoryId}
         setSelectedCategoryId={setSelectedCategoryId}
-        onOpenDrawModal={() => setIsDrawModalOpen(true)}
+        onOpenNewTournamentModal={() => {
+          if (isReadOnly) {
+            setIsLoginModalOpen(true);
+          } else {
+            setIsCreateTournamentModalOpen(true);
+          }
+        }}
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
-        onOpenAddTeamModal={() => setIsAddTeamModalOpen(true)}
+        onOpenUserManager={() => setIsUserManagerOpen(true)}
+        onOpenLogin={() => setIsLoginModalOpen(true)}
+        currentUser={currentUser}
+        onLogout={() => {
+          logout();
+          setCurrentUser(null);
+        }}
         teamsCount={currentCategoryTeams.length}
         hasBracket={Boolean(currentBracket)}
+        isReadOnly={isReadOnly}
       />
 
       {/* Main App Content Viewport */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1">
+        
+        {/* Read-Only Notice Banner for Unauthenticated Visitors */}
+        {isReadOnly && (
+          <div className="mb-5 p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-amber-950/30 to-slate-900 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shadow-lg animate-in fade-in">
+            <div className="flex items-center gap-2.5 text-center sm:text-left">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 flex-shrink-0">
+                <Eye className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="font-extrabold text-amber-300 block sm:inline mr-1">
+                  Modo Somente Leitura (Não Conectado):
+                </span>
+                <span className="text-slate-300 text-xs">
+                  Você pode visualizar todas as duplas, tabelas, jogos e placares. Para realizar alterações ou gerenciar, faça login.
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsLoginModalOpen(true)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-glow-amber transition-all transform hover:scale-105 active:scale-95 whitespace-nowrap flex-shrink-0"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Fazer Login</span>
+            </button>
+          </div>
+        )}
         
         {/* TAB 1: Duplas e Atletas */}
         {activeTab === 'teams' && (
@@ -214,6 +296,8 @@ export default function App() {
             setIsAddModalOpen={setIsAddTeamModalOpen}
             eventInfo={eventInfo}
             onGoToPayments={handleNavigateToPaymentAthlete}
+            onGoToCategories={() => setActiveTab('categories')}
+            isReadOnly={isReadOnly}
           />
         )}
 
@@ -226,6 +310,7 @@ export default function App() {
             eventInfo={eventInfo}
             setEventInfo={setEventInfo}
             targetPaymentAthlete={targetPaymentAthlete}
+            isReadOnly={isReadOnly}
           />
         )}
 
@@ -243,6 +328,7 @@ export default function App() {
             onResetBracket={handleResetBracket}
             onOpenLiveArena={() => setIsArenaLiveOpen(true)}
             onUpdateCourt={handleUpdateCourt}
+            isReadOnly={isReadOnly}
           />
         )}
 
@@ -263,6 +349,7 @@ export default function App() {
             teams={teams}
             selectedCategoryId={selectedCategoryId}
             setSelectedCategoryId={setSelectedCategoryId}
+            isReadOnly={isReadOnly}
           />
         )}
 
@@ -286,6 +373,7 @@ export default function App() {
             onClose={() => setActiveTab('bracket')}
             onSelectUpcomingMatch={handleNavigateToMatch}
             onOpenScoreModal={handleOpenScoreModalForMatch}
+            onUpdateCourt={handleUpdateCourt}
           />
         )}
 
@@ -306,6 +394,13 @@ export default function App() {
       {/* ============================================================ */}
       {/* GLOBAL MODALS */}
       {/* ============================================================ */}
+
+      {/* Create New Clean Tournament Modal */}
+      <CreateTournamentModal
+        isOpen={isCreateTournamentModalOpen}
+        onClose={() => setIsCreateTournamentModalOpen(false)}
+        onCreateTournament={handleCreateNewTournament}
+      />
 
       {/* Draw / Sorteio Modal */}
       <DrawModal
@@ -361,7 +456,37 @@ export default function App() {
           onClose={() => setIsArenaLiveOpen(false)}
           onSelectUpcomingMatch={handleNavigateToMatch}
           onOpenScoreModal={handleOpenScoreModalForMatch}
+          onUpdateCourt={handleUpdateCourt}
+          isReadOnly={isReadOnly}
         />
+      )}
+
+      {/* User and Permissions Manager Modal */}
+      <UserManagerModal
+        isOpen={isUserManagerOpen}
+        onClose={() => setIsUserManagerOpen(false)}
+        currentUser={currentUser}
+      />
+
+      {/* Login Modal Overlay */}
+      {isLoginModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/90 backdrop-blur-md">
+          <LoginScreen
+            eventInfo={eventInfo}
+            categories={categories}
+            teams={teams}
+            brackets={brackets}
+            onClose={() => setIsLoginModalOpen(false)}
+            onLoginSuccess={(user) => {
+              setCurrentUser(user);
+              setIsLoginModalOpen(false);
+            }}
+            onOpenLiveArena={() => {
+              setIsLoginModalOpen(false);
+              setIsArenaLiveOpen(true);
+            }}
+          />
+        </div>
       )}
 
     </div>

@@ -14,7 +14,8 @@ import {
   Crown,
   Sparkles,
   ArrowRight,
-  Maximize2
+  Maximize2,
+  XCircle
 } from 'lucide-react';
 
 export default function TournamentBracket({ 
@@ -28,7 +29,8 @@ export default function TournamentBracket({
   onOpenDrawModal,
   onResetBracket,
   onOpenLiveArena,
-  onUpdateCourt
+  onUpdateCourt,
+  isReadOnly = false
 }) {
   const [activeBracketView, setActiveBracketView] = useState('ALL'); // 'ALL', 'WINNERS', 'LOSERS', 'FINAL'
 
@@ -44,6 +46,22 @@ export default function TournamentBracket({
     }
   }, [targetMatchId, bracket]);
 
+  if (!category) {
+    return (
+      <div className="glass-panel p-12 rounded-3xl text-center space-y-4 max-w-xl mx-auto my-8 border border-slate-800">
+        <div className="w-16 h-16 rounded-2xl bg-slate-800 text-slate-400 border border-slate-700 flex items-center justify-center mx-auto">
+          <GitBranch className="w-8 h-8" />
+        </div>
+        <h3 className="text-2xl font-bold font-display text-white">
+          Nenhuma Categoria Cadastrada
+        </h3>
+        <p className="text-xs sm:text-sm text-slate-400">
+          Cadastre ao menos uma categoria e suas duplas para gerar e acompanhar o chaveamento oficial do torneio.
+        </p>
+      </div>
+    );
+  }
+
   if (!bracket || !bracket.matches) {
     return (
       <div className="glass-panel p-12 rounded-3xl text-center space-y-4 max-w-xl mx-auto my-8">
@@ -58,7 +76,9 @@ export default function TournamentBracket({
         </p>
         <button
           onClick={onOpenDrawModal}
-          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-glow-amber transition-all transform hover:scale-105"
+          disabled={isReadOnly}
+          title={isReadOnly ? 'Apenas visualização: faça login para realizar o sorteio' : 'Realizar Sorteio'}
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-glow-amber transition-all transform hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
         >
           <Shuffle className="w-4 h-4" />
           Realizar Sorteio da Chave
@@ -279,9 +299,10 @@ export default function TournamentBracket({
               </button>
 
               <button
-                onClick={() => onOpenScoreModal(match)}
-                title="Lançar Súmula Rápida"
-                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 text-xs font-black shadow-glow-amber transition-all flex items-center gap-1"
+                onClick={() => !isReadOnly && onOpenScoreModal(match)}
+                disabled={isReadOnly}
+                title={isReadOnly ? 'Apenas visualização: faça login para lançar súmula' : 'Lançar Súmula Rápida'}
+                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 text-xs font-black shadow-glow-amber transition-all flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <span>Súmula</span>
               </button>
@@ -368,10 +389,12 @@ export default function TournamentBracket({
           </button>
           <button
             onClick={onResetBracket}
-            title="Resetar chave da categoria"
-            className="p-2 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 transition-colors"
+            disabled={isReadOnly}
+            title={isReadOnly ? 'Apenas visualização: faça login para cancelar o sorteio' : `Cancelar sorteio da categoria ${category?.name || ''}`}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-950/70 hover:bg-rose-900/90 text-rose-300 hover:text-rose-200 border border-rose-800/80 text-xs font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
           >
-            <Shuffle className="w-4 h-4" />
+            <XCircle className="w-4 h-4 text-rose-400" />
+            <span>Cancelar Sorteio</span>
           </button>
         </div>
       </div>

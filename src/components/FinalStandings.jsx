@@ -31,7 +31,7 @@ export default function FinalStandings({
           Pódio em Disputa
         </h3>
         <p className="text-xs sm:text-sm text-slate-400">
-          A Grande Final da categoria <strong className="text-amber-400">{category?.name}</strong> ainda não foi finalizada. Acompanhe os confrontos na chave de eliminatória dupla.
+          A Grande Final da categoria <strong className="text-amber-400">{category?.name || 'do torneio'}</strong> ainda não foi finalizada. Acompanhe os confrontos na chave de eliminatória dupla.
         </p>
         <button
           onClick={onGoToBracket}

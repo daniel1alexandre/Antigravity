@@ -11,27 +11,41 @@ import {
   PlusCircle, 
   Flame,
   Award,
-  FileText
+  FileText,
+  User,
+  KeyRound,
+  LogOut,
+  ShieldCheck,
+  Lock,
+  Eye
 } from 'lucide-react';
 
 export default function Navbar({ 
   activeTab, 
   setActiveTab, 
-  categories, 
+  categories = [], 
   selectedCategoryId, 
   setSelectedCategoryId,
-  onOpenDrawModal,
+  onOpenNewTournamentModal,
   onOpenSettingsModal,
-  onOpenAddTeamModal,
+  onOpenUserManager,
+  onOpenLogin,
+  currentUser,
+  onLogout,
   teamsCount,
-  hasBracket
+  hasBracket,
+  isReadOnly = false
 }) {
-  const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
+  const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0] || null;
+  const isAdmin = currentUser?.role === 'ADMIN';
+  const isGuest = !currentUser || currentUser?.role === 'VIEWER';
+  const canAccessFinancial = isAdmin || Boolean(currentUser?.permissions?.manageFinancial);
+  const canManageTournaments = isAdmin || Boolean(currentUser?.permissions?.manageTournaments);
 
   return (
     <header className="sticky top-0 z-40 bg-[#0B0F17]/95 backdrop-blur-md border-b border-slate-800 shadow-xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20 gap-4">
+        <div className="flex items-center justify-between h-16 sm:h-20 gap-3">
           
           {/* Brand Logo & Title */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('teams')}>
@@ -56,45 +70,100 @@ export default function Navbar({
           <div className="flex items-center gap-2 bg-slate-900/90 px-3 py-1.5 rounded-xl border border-slate-700/80 shadow-inner">
             <span className="text-xs font-medium text-slate-400 hidden md:inline">Categoria:</span>
             <select
-              value={selectedCategoryId}
+              value={selectedCategoryId || ''}
               onChange={(e) => setSelectedCategoryId(e.target.value)}
               className="bg-transparent text-xs sm:text-sm font-semibold text-amber-400 focus:outline-none cursor-pointer pr-2"
             >
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id} className="bg-slate-900 text-slate-200">
-                  {cat.name} ({cat.shortName})
+              {categories.length === 0 ? (
+                <option value="" className="bg-slate-900 text-slate-400">
+                  Nenhuma Categoria
                 </option>
-              ))}
+              ) : (
+                categories.map((cat) => (
+                  <option key={cat.id} value={cat.id} className="bg-slate-900 text-slate-200">
+                    {cat.name} ({cat.shortName})
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
-          {/* Action Quick Buttons */}
+          {/* User Session & Action Quick Buttons */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={onOpenDrawModal}
-              title="Realizar Sorteio dos Jogos"
-              className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-glow-amber transition-all transform hover:scale-105 active:scale-95"
-            >
-              <Shuffle className="w-4 h-4" />
-              <span className="hidden md:inline">Sorteio da Chave</span>
-            </button>
+            {!currentUser ? (
+              <div className="flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 font-semibold">
+                  <Eye className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Modo Visualização</span>
+                </div>
+                <button
+                  onClick={onOpenLogin}
+                  title="Fazer login no sistema"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs shadow-glow-amber transition-all transform hover:scale-105 active:scale-95"
+                >
+                  <Lock className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Fazer Login</span>
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* User Badge */}
+                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs">
+                  <User className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="font-bold text-slate-200 max-w-[110px] truncate">
+                    {currentUser?.name || currentUser?.username}
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    {currentUser?.role === 'ADMIN' ? 'Admin' : currentUser?.role === 'OPERATOR' ? 'Mesário' : 'Visitante'}
+                  </span>
+                </div>
 
-            <button
-              onClick={onOpenAddTeamModal}
-              title="Cadastrar Nova Dupla"
-              className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all active:scale-95"
-            >
-              <PlusCircle className="w-4 h-4 text-emerald-400" />
-              <span className="hidden md:inline">Nova Dupla</span>
-            </button>
+                {/* Admin User Management Button */}
+                {isAdmin && (
+                  <button
+                    onClick={onOpenUserManager}
+                    title="Gerenciar Usuários & Permissões"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-amber-300 border border-slate-800 hover:border-amber-500/40 text-xs font-bold transition-all shadow-sm"
+                  >
+                    <KeyRound className="w-4 h-4 text-amber-400" />
+                    <span className="hidden xl:inline">Usuários</span>
+                  </button>
+                )}
 
-            <button
-              onClick={onOpenSettingsModal}
-              title="Configurações e Backup"
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all hover:text-white"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
+                {/* Create Tournament Button (Admins only) */}
+                {canManageTournaments && (
+                  <button
+                    onClick={onOpenNewTournamentModal}
+                    title="Criar Novo Torneio do Zero"
+                    className="flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-glow-amber transition-all transform hover:scale-105 active:scale-95"
+                  >
+                    <PlusCircle className="w-4 h-4 text-slate-950" />
+                    <span className="hidden sm:inline">Criar Novo Torneio</span>
+                    <span className="sm:hidden">Novo</span>
+                  </button>
+                )}
+
+                {/* Settings Button */}
+                {isAdmin && (
+                  <button
+                    onClick={onOpenSettingsModal}
+                    title="Configurações e Backup"
+                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all hover:text-white"
+                  >
+                    <Settings className="w-5 h-5" />
+                  </button>
+                )}
+
+                {/* Logout / Switch User */}
+                <button
+                  onClick={onLogout}
+                  title="Sair / Desconectar"
+                  className="p-2 rounded-xl bg-slate-900 hover:bg-rose-950/50 text-slate-400 hover:text-rose-300 border border-slate-800 hover:border-rose-500/40 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </>
+            )}
           </div>
 
         </div>
@@ -116,17 +185,19 @@ export default function Navbar({
             </span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('payments')}
-            className={`flex-1 min-w-fit flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'payments'
-                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/40 shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            <CreditCard className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-            <span>Controle Financeiro</span>
-          </button>
+          {canAccessFinancial && (
+            <button
+              onClick={() => setActiveTab('payments')}
+              className={`flex-1 min-w-fit flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
+                activeTab === 'payments'
+                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+            >
+              <CreditCard className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <span>Financeiro</span>
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab('bracket')}
@@ -155,17 +226,19 @@ export default function Navbar({
             <span>Pódio & Campeões</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('categories')}
-            className={`flex-1 min-w-fit flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'categories'
-                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/40 shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            <Layers className="w-4 h-4 text-purple-400 flex-shrink-0" />
-            <span>Categorias</span>
-          </button>
+          {(!isGuest || isAdmin) && (
+            <button
+              onClick={() => setActiveTab('categories')}
+              className={`flex-1 min-w-fit flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
+                activeTab === 'categories'
+                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+            >
+              <Layers className="w-4 h-4 text-purple-400 flex-shrink-0" />
+              <span>Categorias</span>
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab('reports')}
