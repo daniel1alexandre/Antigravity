@@ -21,7 +21,8 @@ import {
   Layers,
   ArrowUpRight,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 import { PAYMENT_STATUS, PAYMENT_METHODS, getAthletePayment } from '../types/tournament';
 
