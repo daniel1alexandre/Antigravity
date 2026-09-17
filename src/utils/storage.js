@@ -24,6 +24,21 @@ export function loadTournamentData() {
     if (!eventInfo.sponsors || !Array.isArray(eventInfo.sponsors)) {
       eventInfo.sponsors = [];
     }
+    if (!eventInfo.scheduleConfig || typeof eventInfo.scheduleConfig !== 'object') {
+      eventInfo.scheduleConfig = {
+        startTime: '08:00',
+        matchDuration: 25,
+        warmupDuration: 5,
+        courtSwitchDuration: 3,
+        selectedCourtIds: eventInfo.courts?.map(c => c.id) || ['court-1', 'court-2'],
+        categoryOrder: [],
+        lunchBreak: {
+          enabled: false,
+          startTime: '12:30',
+          duration: 45
+        }
+      };
+    }
 
     const rawCategories = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
     const categories = rawCategories !== null ? JSON.parse(rawCategories) : DEFAULT_CATEGORIES;
@@ -64,6 +79,19 @@ export function createNewTournament(customInfo = {}) {
     defaultEntryFee: 140,
     expenses: [],
     sponsors: [],
+    scheduleConfig: {
+      startTime: '08:00',
+      matchDuration: 25,
+      warmupDuration: 5,
+      courtSwitchDuration: 3,
+      selectedCourtIds: DEFAULT_COURTS.map(c => c.id),
+      categoryOrder: [],
+      lunchBreak: {
+        enabled: false,
+        startTime: '12:30',
+        duration: 45
+      }
+    },
     ...customInfo,
   };
 

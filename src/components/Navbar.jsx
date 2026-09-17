@@ -17,7 +17,8 @@ import {
   LogOut,
   ShieldCheck,
   Lock,
-  Eye
+  Eye,
+  Calendar
 } from 'lucide-react';
 
 export default function Navbar({ 
@@ -212,6 +213,18 @@ export default function Navbar({
             {hasBracket && (
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
             )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('schedule')}
+            className={`flex-1 min-w-fit flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
+              activeTab === 'schedule'
+                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <Calendar className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <span>Programação</span>
           </button>
 
           <button

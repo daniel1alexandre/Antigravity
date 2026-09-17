@@ -14,6 +14,7 @@ import SettingsBackupModal from './components/SettingsBackupModal';
 import CreateTournamentModal from './components/CreateTournamentModal';
 import LoginScreen from './components/LoginScreen';
 import UserManagerModal from './components/UserManagerModal';
+import ScheduleManager from './components/ScheduleManager';
 
 import { loadTournamentData, saveTournamentData, createNewTournament } from './utils/storage';
 import { updateMatchScore } from './utils/doubleEliminationEngine';
@@ -328,6 +329,19 @@ export default function App() {
             onResetBracket={handleResetBracket}
             onOpenLiveArena={() => setIsArenaLiveOpen(true)}
             onUpdateCourt={handleUpdateCourt}
+            isReadOnly={isReadOnly}
+          />
+        )}
+
+        {/* TAB: Programação Oficial dos Jogos */}
+        {activeTab === 'schedule' && (
+          <ScheduleManager
+            categories={categories}
+            teams={teams}
+            brackets={brackets}
+            eventInfo={eventInfo}
+            setEventInfo={setEventInfo}
+            onNavigateToBracket={() => setActiveTab('bracket')}
             isReadOnly={isReadOnly}
           />
         )}
