@@ -10,7 +10,9 @@ import {
   Trophy, 
   Timer, 
   Flame,
-  Award
+  Award,
+  Coffee,
+  Lock
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -27,6 +29,14 @@ export default function CourtScoreboard({
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [switchSideAlert, setSwitchSideAlert] = useState(false);
+
+  const isBye = Boolean(
+    match?.isBye || 
+    match?.team1?.isBye || 
+    match?.team2?.isBye || 
+    match?.team1?.id?.startsWith('BYE') || 
+    match?.team2?.id?.startsWith('BYE')
+  );
 
   useEffect(() => {
     if (match) {
@@ -54,6 +64,7 @@ export default function CourtScoreboard({
   const totalPoints = score1 + score2;
 
   const handlePointChange = (team, delta) => {
+    if (isBye) return;
     if (team === 'team1') {
       const next = Math.max(0, score1 + delta);
       setScore1(next);
@@ -81,6 +92,7 @@ export default function CourtScoreboard({
   };
 
   const handleFinishMatch = () => {
+    if (isBye) return;
     if (score1 === score2) {
       alert('Não pode haver empate no resultado final.');
       return;
@@ -150,21 +162,35 @@ export default function CourtScoreboard({
         </div>
       )}
 
+      {/* BYE Highlight Banner */}
+      {isBye && (
+        <div className="bg-purple-950/90 border border-purple-500/60 text-purple-200 py-3 px-5 rounded-2xl flex items-center justify-center gap-2.5 shadow-lg">
+          <Coffee className="w-5 h-5 text-purple-400" />
+          <span className="font-bold text-sm">Partida com Folga (BYE) • Digitação e alteração de placar desabilitadas</span>
+          <Lock className="w-4 h-4 text-purple-300 ml-1" />
+        </div>
+      )}
+
       {/* Main Scoreboard Display */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 my-auto max-w-5xl mx-auto w-full">
         
         {/* Team 1 Side */}
         <div className={`p-6 sm:p-8 rounded-3xl border text-center flex flex-col justify-between transition-all duration-300 ${
-          servingTeam === 'team1'
+          isBye
+            ? 'bg-slate-900/40 border-slate-800 opacity-80'
+            : servingTeam === 'team1'
             ? 'bg-slate-900/90 border-amber-500/80 shadow-glow-amber ring-2 ring-amber-500/20'
             : 'bg-slate-900/40 border-slate-800'
         }`}>
           <div>
             {/* Serve indicator button */}
             <button
-              onClick={() => setServingTeam('team1')}
+              onClick={() => !isBye && setServingTeam('team1')}
+              disabled={isBye}
               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                servingTeam === 'team1'
+                isBye
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                  : servingTeam === 'team1'
                   ? 'bg-amber-500 text-slate-950 shadow-md'
                   : 'bg-slate-800 text-slate-400 hover:text-white'
               }`}
@@ -183,7 +209,7 @@ export default function CourtScoreboard({
           {/* Huge Score Number */}
           <div className="my-4">
             <span className="font-mono text-7xl sm:text-9xl font-black text-amber-400 tracking-tighter drop-shadow-md">
-              {score1}
+              {isBye ? '-' : score1}
             </span>
           </div>
 
@@ -191,13 +217,23 @@ export default function CourtScoreboard({
           <div className="grid grid-cols-2 gap-3 mt-2">
             <button
               onClick={() => handlePointChange('team1', -1)}
-              className="py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-black text-2xl active:scale-95 transition-transform"
+              disabled={isBye}
+              className={`py-4 rounded-2xl font-black text-2xl transition-transform ${
+                isBye
+                  ? 'bg-slate-900 text-slate-600 cursor-not-allowed opacity-40'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 active:scale-95'
+              }`}
             >
               - 1
             </button>
             <button
               onClick={() => handlePointChange('team1', 1)}
-              className="py-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-2xl shadow-glow-amber active:scale-95 transition-transform"
+              disabled={isBye}
+              className={`py-4 rounded-2xl font-black text-2xl transition-transform ${
+                isBye
+                  ? 'bg-slate-900 text-slate-600 cursor-not-allowed opacity-40'
+                  : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-glow-amber active:scale-95'
+              }`}
             >
               + 1
             </button>
@@ -206,16 +242,21 @@ export default function CourtScoreboard({
 
         {/* Team 2 Side */}
         <div className={`p-6 sm:p-8 rounded-3xl border text-center flex flex-col justify-between transition-all duration-300 ${
-          servingTeam === 'team2'
+          isBye
+            ? 'bg-slate-900/40 border-slate-800 opacity-80'
+            : servingTeam === 'team2'
             ? 'bg-slate-900/90 border-amber-500/80 shadow-glow-amber ring-2 ring-amber-500/20'
             : 'bg-slate-900/40 border-slate-800'
         }`}>
           <div>
             {/* Serve indicator button */}
             <button
-              onClick={() => setServingTeam('team2')}
+              onClick={() => !isBye && setServingTeam('team2')}
+              disabled={isBye}
               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                servingTeam === 'team2'
+                isBye
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                  : servingTeam === 'team2'
                   ? 'bg-amber-500 text-slate-950 shadow-md'
                   : 'bg-slate-800 text-slate-400 hover:text-white'
               }`}
@@ -234,7 +275,7 @@ export default function CourtScoreboard({
           {/* Huge Score Number */}
           <div className="my-4">
             <span className="font-mono text-7xl sm:text-9xl font-black text-amber-400 tracking-tighter drop-shadow-md">
-              {score2}
+              {isBye ? '-' : score2}
             </span>
           </div>
 
@@ -242,13 +283,23 @@ export default function CourtScoreboard({
           <div className="grid grid-cols-2 gap-3 mt-2">
             <button
               onClick={() => handlePointChange('team2', -1)}
-              className="py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-black text-2xl active:scale-95 transition-transform"
+              disabled={isBye}
+              className={`py-4 rounded-2xl font-black text-2xl transition-transform ${
+                isBye
+                  ? 'bg-slate-900 text-slate-600 cursor-not-allowed opacity-40'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 active:scale-95'
+              }`}
             >
               - 1
             </button>
             <button
               onClick={() => handlePointChange('team2', 1)}
-              className="py-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-2xl shadow-glow-amber active:scale-95 transition-transform"
+              disabled={isBye}
+              className={`py-4 rounded-2xl font-black text-2xl transition-transform ${
+                isBye
+                  ? 'bg-slate-900 text-slate-600 cursor-not-allowed opacity-40'
+                  : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-glow-amber active:scale-95'
+              }`}
             >
               + 1
             </button>
@@ -262,17 +313,24 @@ export default function CourtScoreboard({
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
+              if (isBye) return;
               setScore1(0);
               setScore2(0);
             }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 text-xs font-semibold"
+            disabled={isBye}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold ${
+              isBye ? 'bg-slate-900 text-slate-600 cursor-not-allowed opacity-40' : 'bg-slate-900 hover:bg-slate-800 text-slate-400'
+            }`}
           >
             <RotateCcw className="w-3.5 h-3.5" /> Zerar Placar
           </button>
 
           <button
-            onClick={() => setSwitchSideAlert(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 text-xs font-semibold"
+            onClick={() => !isBye && setSwitchSideAlert(true)}
+            disabled={isBye}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold ${
+              isBye ? 'bg-slate-900 text-slate-600 cursor-not-allowed opacity-40' : 'bg-slate-900 hover:bg-slate-800 text-cyan-400'
+            }`}
           >
             <ArrowLeftRight className="w-3.5 h-3.5" /> Trocar Lado
           </button>
@@ -280,10 +338,24 @@ export default function CourtScoreboard({
 
         <button
           onClick={handleFinishMatch}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm shadow-glow-emerald transition-all transform hover:scale-105 active:scale-95"
+          disabled={isBye}
+          className={`w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3 rounded-2xl font-black text-sm transition-all ${
+            isBye
+              ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-50'
+              : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-glow-emerald transform hover:scale-105 active:scale-95'
+          }`}
         >
-          <Check className="w-5 h-5" />
-          Encerrar Partida & Salvar Súmula
+          {isBye ? (
+            <>
+              <Lock className="w-5 h-5 text-purple-400" />
+              Partida de Folga • Digitação Bloqueada
+            </>
+          ) : (
+            <>
+              <Check className="w-5 h-5" />
+              Encerrar Partida & Salvar Súmula
+            </>
+          )}
         </button>
       </div>
 

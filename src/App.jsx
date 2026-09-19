@@ -139,6 +139,12 @@ export default function App() {
     const targetBracket = brackets[targetCatId];
     if (!targetBracket) return;
 
+    const matchObj = targetBracket.matches?.[matchId];
+    if (matchObj?.isBye || matchObj?.team1?.isBye || matchObj?.team2?.isBye || matchObj?.team1?.id?.startsWith('BYE') || matchObj?.team2?.id?.startsWith('BYE')) {
+      alert('Esta partida é uma folga (BYE) e não permite alteração de resultado.');
+      return;
+    }
+
     try {
       const updatedBracket = updateMatchScore(targetBracket, matchId, score1, score2, sets);
       setBrackets({
@@ -171,6 +177,11 @@ export default function App() {
     const targetBracket = brackets[targetCatId];
     const match = targetBracket.matches[matchId];
     if (!match) return;
+
+    // Prevent court assignment to BYE matches
+    if (match.isBye || match.team1?.isBye || match.team2?.isBye || match.team1?.id?.startsWith('BYE') || match.team2?.id?.startsWith('BYE')) {
+      return;
+    }
 
     if (court) {
       // Check if court is currently being used by any active match across all categories
