@@ -132,6 +132,10 @@ export default function App() {
     );
   }
 
+  const handleRegisterTeam = (newTeam) => {
+    setTeams((prev) => [newTeam, ...prev]);
+  };
+
   // ── Not authenticated → show login fullscreen ──────────────────────────────
   if (!currentUser && publicView === null) {
     return (
@@ -145,6 +149,7 @@ export default function App() {
           setPublicView(null);
         }}
         onClose={() => setPublicView(true)}
+        onRegisterTeam={handleRegisterTeam}
       />
     );
   }
@@ -160,6 +165,7 @@ export default function App() {
         onGoToLogin={() => {
           setPublicView(null);
         }}
+        onRegisterTeam={handleRegisterTeam}
       />
     );
   }
@@ -538,6 +544,7 @@ export default function App() {
             teams={teams}
             brackets={brackets}
             onClose={() => setIsLoginModalOpen(false)}
+            onRegisterTeam={handleRegisterTeam}
             onLoginSuccess={(user) => {
               setCurrentUser(user);
               setIsLoginModalOpen(false);

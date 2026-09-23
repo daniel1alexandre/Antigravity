@@ -14,9 +14,11 @@ import {
   ShieldCheck, 
   ChevronRight,
   Clock,
-  X
+  X,
+  UserPlus
 } from 'lucide-react';
 import { authenticate } from '../utils/auth';
+import PublicRegistrationModal from './PublicRegistrationModal';
 
 export default function LoginScreen({ 
   onLoginSuccess, 
@@ -25,7 +27,8 @@ export default function LoginScreen({
   teams = [], 
   brackets = {},
   onOpenLiveArena,
-  onClose
+  onClose,
+  onRegisterTeam
 }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -194,21 +197,56 @@ export default function LoginScreen({
 
             {/* Public Interactive Action Buttons */}
             <div className="space-y-3 pt-2">
-              <p className="text-xs font-semibold text-slate-400">
-                Consulte as informações do torneio abertamente:
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-slate-400">
+                  Ações públicas do torneio:
+                </p>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Inscrições Abertas
+                </span>
+              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Botão de Destaque: Fazer Inscrição */}
+              <button
+                type="button"
+                onClick={() => setPublicModal('REGISTER')}
+                className="w-full p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-amber-600/15 to-amber-500/10 hover:from-amber-500/30 hover:to-amber-600/20 border border-amber-500/50 hover:border-amber-400 transition-all duration-200 flex items-center justify-between text-left group shadow-glow-amber cursor-pointer"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold shadow-md group-hover:scale-105 transition-transform flex-shrink-0">
+                    <UserPlus className="w-6 h-6 text-slate-950" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm sm:text-base font-extrabold text-white group-hover:text-amber-300 block">
+                        Fazer Inscrição no Torneio
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        ONLINE
+                      </span>
+                    </div>
+                    <span className="text-xs text-amber-200/80">
+                      Cadastre sua dupla, selecione a categoria e garanta sua vaga
+                    </span>
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 group-hover:bg-amber-500 group-hover:text-slate-950 text-amber-400 flex items-center justify-center transition-colors flex-shrink-0">
+                  <ArrowRight className="w-4 h-4" />
+                </div>
+              </button>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 {/* Button 1: Ver Inscritos */}
                 <button
                   onClick={() => {
                     setSelectedPublicCategory(categories[0]?.id || '');
                     setPublicModal('TEAMS');
                   }}
-                  className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-950 hover:from-amber-500/20 hover:to-amber-600/10 border border-slate-800 hover:border-amber-500/60 transition-all duration-200 flex items-center justify-between text-left group shadow-sm hover:shadow-glow-amber"
+                  className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-950 hover:from-slate-800/80 hover:to-slate-900 border border-slate-800 hover:border-slate-700 transition-all duration-200 flex items-center justify-between text-left group shadow-sm cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
+                    <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 group-hover:text-white transition-colors">
                       <Users className="w-5 h-5" />
                     </div>
                     <div>
@@ -216,7 +254,7 @@ export default function LoginScreen({
                         Ver Lista de Inscritos
                       </span>
                       <span className="text-[11px] text-slate-400">
-                        {teams.length} duplas e atletas confirmados
+                        {teams.length} duplas confirmadas
                       </span>
                     </div>
                   </div>
@@ -230,7 +268,7 @@ export default function LoginScreen({
                       setSelectedPublicCategory(categories[0]?.id || '');
                       setPublicModal('MATCHES');
                     }}
-                    className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-950 hover:from-purple-500/20 hover:to-purple-600/10 border border-slate-800 hover:border-purple-500/60 transition-all duration-200 flex items-center justify-between text-left group shadow-sm"
+                    className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-950 hover:from-purple-500/20 hover:to-purple-600/10 border border-slate-800 hover:border-purple-500/60 transition-all duration-200 flex items-center justify-between text-left group shadow-sm cursor-pointer"
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 group-hover:bg-purple-500 group-hover:text-white transition-colors">
@@ -241,7 +279,7 @@ export default function LoginScreen({
                           Tabela de Jogos
                         </span>
                         <span className="text-[11px] text-slate-400">
-                          Confrontos, placares e chaveamento
+                          Confrontos e chaveamento
                         </span>
                       </div>
                     </div>
@@ -393,12 +431,21 @@ export default function LoginScreen({
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setPublicModal(null)}
-                className="p-2 rounded-xl text-slate-400 hover:text-white bg-slate-800/80"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPublicModal('REGISTER')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-sm transition-all cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Inscrever Dupla</span>
+                </button>
+                <button
+                  onClick={() => setPublicModal(null)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-white bg-slate-800/80 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Category Pills & Search */}
@@ -638,6 +685,22 @@ export default function LoginScreen({
           </div>
         </div>
       )}
+
+      {/* ============================================================ */}
+      {/* MODAL: INSCRIÇÃO DE DUPLA NA TELA INICIAL */}
+      {/* ============================================================ */}
+      <PublicRegistrationModal
+        isOpen={publicModal === 'REGISTER'}
+        onClose={() => setPublicModal(null)}
+        categories={categories}
+        teams={teams}
+        eventInfo={eventInfo}
+        onRegisterTeam={onRegisterTeam}
+        onViewTeamsList={(catId) => {
+          if (catId) setSelectedPublicCategory(catId);
+          setPublicModal('TEAMS');
+        }}
+      />
 
     </div>
   );
