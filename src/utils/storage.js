@@ -32,12 +32,33 @@ export function loadTournamentData() {
         courtSwitchDuration: 3,
         selectedCourtIds: eventInfo.courts?.map(c => c.id) || ['court-1', 'court-2'],
         categoryOrder: [],
+        days: [
+          {
+            id: 'day-1',
+            name: 'Dia 1',
+            date: eventInfo.date || '2026-09-05',
+            startTime: '08:00',
+            categoryIds: DEFAULT_CATEGORIES.map(c => c.id)
+          }
+        ],
         lunchBreak: {
           enabled: false,
           startTime: '12:30',
           duration: 45
         }
       };
+    } else if (!Array.isArray(eventInfo.scheduleConfig.days) || eventInfo.scheduleConfig.days.length === 0) {
+      eventInfo.scheduleConfig.days = [
+        {
+          id: 'day-1',
+          name: 'Dia 1',
+          date: eventInfo.date || '2026-09-05',
+          startTime: eventInfo.scheduleConfig.startTime || '08:00',
+          categoryIds: Array.isArray(eventInfo.scheduleConfig.categoryOrder) && eventInfo.scheduleConfig.categoryOrder.length > 0
+            ? eventInfo.scheduleConfig.categoryOrder
+            : DEFAULT_CATEGORIES.map(c => c.id)
+        }
+      ];
     }
 
     const rawCategories = localStorage.getItem(STORAGE_KEYS.CATEGORIES);

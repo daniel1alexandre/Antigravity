@@ -15,6 +15,7 @@ import CreateTournamentModal from './components/CreateTournamentModal';
 import LoginScreen from './components/LoginScreen';
 import UserManagerModal from './components/UserManagerModal';
 import ScheduleManager from './components/ScheduleManager';
+import PublicViewScreen from './components/PublicViewScreen';
 
 import { loadTournamentData, saveTournamentData, createNewTournament } from './utils/storage';
 import { updateMatchScore } from './utils/doubleEliminationEngine';
@@ -26,6 +27,8 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
   const [isUserManagerOpen, setIsUserManagerOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  // publicView: null = not set yet, false = logged in panel, true = public view
+  const [publicView, setPublicView] = useState(null);
   const isReadOnly = !currentUser;
 
   // Main State
@@ -126,6 +129,38 @@ export default function App() {
       <div className="min-h-screen bg-[#0B0F17] flex items-center justify-center text-amber-400 font-bold text-lg">
         Carregando Torneio de Futvôlei...
       </div>
+    );
+  }
+
+  // ── Not authenticated → show login fullscreen ──────────────────────────────
+  if (!currentUser && publicView === null) {
+    return (
+      <LoginScreen
+        eventInfo={eventInfo}
+        categories={categories}
+        teams={teams}
+        brackets={brackets}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          setPublicView(null);
+        }}
+        onClose={() => setPublicView(true)}
+      />
+    );
+  }
+
+  // ── Public view (no login) ─────────────────────────────────────────────────
+  if (publicView === true) {
+    return (
+      <PublicViewScreen
+        eventInfo={eventInfo}
+        categories={categories}
+        teams={teams}
+        brackets={brackets}
+        onGoToLogin={() => {
+          setPublicView(null);
+        }}
+      />
     );
   }
 
@@ -261,6 +296,7 @@ export default function App() {
         onLogout={() => {
           logout();
           setCurrentUser(null);
+          setPublicView(null); // Retorna à tela de login
         }}
         teamsCount={currentCategoryTeams.length}
         hasBracket={Boolean(currentBracket)}
@@ -493,7 +529,7 @@ export default function App() {
         currentUser={currentUser}
       />
 
-      {/* Login Modal Overlay */}
+      {/* Login Modal Overlay (quando já está no painel e quer fazer login) */}
       {isLoginModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/90 backdrop-blur-md">
           <LoginScreen
@@ -505,10 +541,6 @@ export default function App() {
             onLoginSuccess={(user) => {
               setCurrentUser(user);
               setIsLoginModalOpen(false);
-            }}
-            onOpenLiveArena={() => {
-              setIsLoginModalOpen(false);
-              setIsArenaLiveOpen(true);
             }}
           />
         </div>
