@@ -90,12 +90,26 @@ export default function CategoryManager({
   };
 
   const colors = [
-    { label: 'Dourado', value: '#F59E0B' },
-    { label: 'Esmeralda', value: '#10B981' },
-    { label: 'Ciano', value: '#06B6D4' },
+    { label: 'Dourado / Âmbar', value: '#F59E0B' },
+    { label: 'Amarelo Ouro', value: '#EAB308' },
+    { label: 'Laranja Solar', value: '#F97316' },
+    { label: 'Laranja Queimado', value: '#EA580C' },
+    { label: 'Vermelho Vivo', value: '#EF4444' },
+    { label: 'Carmim / Rubi', value: '#E11D48' },
     { label: 'Rosa Pink', value: '#EC4899' },
-    { label: 'Roxo', value: '#8B5CF6' },
-    { label: 'Vermelho', value: '#EF4444' },
+    { label: 'Fúcsia', value: '#D946EF' },
+    { label: 'Roxo Imperial', value: '#8B5CF6' },
+    { label: 'Violeta', value: '#7C3AED' },
+    { label: 'Índigo Profundo', value: '#6366F1' },
+    { label: 'Azul Royal', value: '#3B82F6' },
+    { label: 'Azul Céu', value: '#0EA5E9' },
+    { label: 'Ciano / Turquesa', value: '#06B6D4' },
+    { label: 'Azul Petróleo (Teal)', value: '#14B8A6' },
+    { label: 'Esmeralda', value: '#10B981' },
+    { label: 'Verde Limão', value: '#84CC16' },
+    { label: 'Verde Menta', value: '#22C55E' },
+    { label: 'Bronze / Ocre', value: '#D97706' },
+    { label: 'Cinza Titânio', value: '#64748B' },
   ];
 
   return (
@@ -145,7 +159,7 @@ export default function CategoryManager({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
         {categories.map((cat) => {
           const categoryTeams = teams.filter(t => t.categoryId === cat.id);
           const paidTeams = categoryTeams.filter(t => t.paymentStatus === 'PAID_FULL');
@@ -354,15 +368,32 @@ export default function CategoryManager({
 
               {/* Color Picker */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Cor do Card</label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-slate-300">
+                    Cor da Categoria
+                  </label>
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                    <span>Personalizada:</span>
+                    <input
+                      type="color"
+                      value={formData.color || '#F59E0B'}
+                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                      className="w-6 h-6 rounded cursor-pointer border border-slate-700 bg-transparent"
+                      title="Escolher qualquer cor personalizada"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
                   {colors.map((c) => (
                     <button
                       key={c.value}
                       type="button"
                       onClick={() => setFormData({ ...formData, color: c.value })}
-                      className={`w-7 h-7 rounded-full border-2 transition-transform ${
-                        formData.color === c.value ? 'scale-125 border-white shadow-lg' : 'border-transparent opacity-70 hover:opacity-100'
+                      className={`w-6 h-6 rounded-full border-2 transition-all relative ${
+                        formData.color?.toLowerCase() === c.value.toLowerCase()
+                          ? 'scale-125 border-white shadow-lg shadow-white/30 z-10 ring-2 ring-purple-500/50'
+                          : 'border-transparent opacity-75 hover:opacity-100 hover:scale-110'
                       }`}
                       style={{ backgroundColor: c.value }}
                       title={c.label}

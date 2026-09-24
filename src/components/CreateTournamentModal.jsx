@@ -57,14 +57,14 @@ export default function CreateTournamentModal({
           </div>
         </div>
 
-        {/* Warning Alert Box */}
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 text-xs text-amber-200/90 leading-relaxed">
-          <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+        {/* Information Box */}
+        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-3 text-xs text-emerald-200/90 leading-relaxed">
+          <Sparkles className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
           <div>
-            <strong className="text-amber-300 font-semibold block mb-1">
-              Atenção: Novo Torneio do Zero
+            <strong className="text-emerald-300 font-semibold block mb-1">
+              Novo Torneio Independente
             </strong>
-            Ao confirmar, todas as categorias, duplas, chaveamentos e placares do torneio anterior serão apagados. Você iniciará com um evento totalmente limpo para configurar as novas categorias.
+            O torneio atual será preservado com segurança e não será modificado. Este novo torneio será criado do zero com suas próprias categorias, duplas e chaveamentos, e você poderá alternar entre eles a qualquer momento.
           </div>
         </div>
 

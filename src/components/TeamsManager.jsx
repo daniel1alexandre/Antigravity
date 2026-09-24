@@ -516,43 +516,108 @@ export default function TeamsManager({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
           {filteredTeams.map((team, index) => {
             const cat = categories.find(c => c.id === team.categoryId) || selectedCategory;
             const entryFee = cat ? cat.entryFee : 140;
             const p1Pay = getAthletePayment(team, 1, entryFee);
             const p2Pay = getAthletePayment(team, 2, entryFee);
-            const pStatus = PAYMENT_STATUS[team.paymentStatus] || PAYMENT_STATUS.PENDING;
+
+            // Determine individual athlete payments
+            const isP1Paid = p1Pay.status === 'PAID_FULL' || p1Pay.status === 'EXEMPT' || Number(p1Pay.amount) > 0;
+            const isP2Paid = p2Pay.status === 'PAID_FULL' || p2Pay.status === 'EXEMPT' || Number(p2Pay.amount) > 0;
+
+            // Visual theme according to team payment state:
+            // GREEN: both paid / exempt
+            // YELLOW: only one of the two paid
+            // RED: neither paid
+            let cardColorConfig = {
+              container: 'bg-gradient-to-br from-red-950/60 via-rose-950/45 to-slate-900/95 backdrop-blur-md border border-red-500/55 shadow-lg shadow-red-950/30 ring-1 ring-red-500/20 hover:border-red-400 hover:shadow-red-500/20',
+              athleteBox: 'bg-red-950/35 border border-red-500/30 hover:bg-red-900/35 hover:border-red-400/50',
+              athleteP1Index: 'bg-red-500/20 border-red-500/40 text-red-300',
+              athleteP2Index: 'bg-red-500/20 border-red-500/40 text-red-300',
+              numLabel: 'text-red-300/90 font-mono font-bold',
+              locationText: 'text-red-100/70',
+              badge: 'bg-red-500/20 text-red-200 border-red-400/40',
+              label: 'Pendente',
+              icon: AlertCircle,
+              iconColor: 'text-red-400',
+              titleHover: 'group-hover:text-red-200',
+              footerBorder: 'border-red-900/40',
+              financeBtn: 'bg-red-950/60 border-red-400/50 text-red-200 hover:bg-red-900/60 hover:border-red-300',
+              actionBtn: 'bg-red-950/40 border border-red-800/40 hover:bg-red-900/50 text-red-200',
+            };
+
+            if ((isP1Paid && isP2Paid) || team.paymentStatus === 'PAID_FULL' || team.paymentStatus === 'EXEMPT') {
+              cardColorConfig = {
+                container: 'bg-gradient-to-br from-emerald-950/60 via-teal-950/45 to-slate-900/95 backdrop-blur-md border border-emerald-500/55 shadow-lg shadow-emerald-950/30 ring-1 ring-emerald-500/20 hover:border-emerald-400 hover:shadow-emerald-500/20',
+                athleteBox: 'bg-emerald-950/35 border border-emerald-500/30 hover:bg-emerald-900/35 hover:border-emerald-400/50',
+                athleteP1Index: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300',
+                athleteP2Index: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300',
+                numLabel: 'text-emerald-300/90 font-mono font-bold',
+                locationText: 'text-emerald-100/70',
+                badge: 'bg-emerald-500/20 text-emerald-200 border-emerald-400/40',
+                label: 'Quitada',
+                icon: CheckCircle2,
+                iconColor: 'text-emerald-400',
+                titleHover: 'group-hover:text-emerald-200',
+                footerBorder: 'border-emerald-900/40',
+                financeBtn: 'bg-emerald-950/60 border-emerald-400/50 text-emerald-200 hover:bg-emerald-900/60 hover:border-emerald-300',
+                actionBtn: 'bg-emerald-950/40 border border-emerald-800/40 hover:bg-emerald-900/50 text-emerald-200',
+              };
+            } else if (isP1Paid || isP2Paid) {
+              cardColorConfig = {
+                container: 'bg-gradient-to-br from-yellow-950/60 via-amber-950/45 to-slate-900/95 backdrop-blur-md border border-amber-400/65 shadow-lg shadow-yellow-950/30 ring-1 ring-yellow-400/25 hover:border-yellow-300 hover:shadow-yellow-500/20',
+                athleteBox: 'bg-yellow-950/35 border border-amber-500/30 hover:bg-yellow-900/35 hover:border-amber-300/50',
+                athleteP1Index: 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300',
+                athleteP2Index: 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300',
+                numLabel: 'text-yellow-300/90 font-mono font-bold',
+                locationText: 'text-yellow-100/70',
+                badge: 'bg-yellow-500/20 text-yellow-200 border-yellow-400/40',
+                label: '1/2 Pago',
+                icon: Clock,
+                iconColor: 'text-yellow-400',
+                titleHover: 'group-hover:text-yellow-200',
+                footerBorder: 'border-yellow-900/40',
+                financeBtn: 'bg-yellow-950/60 border-amber-400/50 text-yellow-200 hover:bg-yellow-900/60 hover:border-yellow-300',
+                actionBtn: 'bg-yellow-950/40 border border-yellow-800/40 hover:bg-yellow-900/50 text-yellow-200',
+              };
+            }
 
             return (
               <div
                 key={team.id}
                 onClick={() => onGoToPayments && onGoToPayments(team.id, 1)}
                 title="Clique para abrir o Financeiro desta dupla"
-                className="glass-card rounded-2xl p-5 relative overflow-hidden group flex flex-col justify-between border border-slate-800/80 hover:border-emerald-500/50 hover:shadow-glow-emerald transition-all duration-300 shadow-lg cursor-pointer transform hover:-translate-y-1"
+                className={`rounded-2xl p-5 relative overflow-hidden group flex flex-col justify-between transition-all duration-300 shadow-xl cursor-pointer transform hover:-translate-y-1 ${cardColorConfig.container}`}
               >
-                {/* Seed Badge */}
-                {team.isSeed && (
-                  <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-500 to-amber-600 text-slate-950 text-[11px] font-black px-3 py-1 rounded-bl-xl shadow-md flex items-center gap-1 z-10">
-                    <Sparkles className="w-3 h-3" />
-                    Cabeça #{team.seedRank || 1}
-                  </div>
-                )}
-
                 <div>
                   {/* Dupla Header */}
-                  <div className="flex items-start justify-between gap-2 pr-16">
-                    <div>
-                      <span className="text-[10px] font-mono font-bold text-slate-500">
-                        DUPLA #{index + 1}
-                      </span>
-                      <h3 className="font-extrabold text-lg text-white font-display leading-tight group-hover:text-amber-400 transition-colors flex items-center gap-2">
-                        {team.displayName}
-                        <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition-colors opacity-0 group-hover:opacity-100" />
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className={`text-[10px] ${cardColorConfig.numLabel}`}>
+                          DUPLA #{index + 1}
+                        </span>
+                        {team.isSeed && (
+                          <span className="bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1 flex-shrink-0">
+                            <Sparkles className="w-2.5 h-2.5" />
+                            Cabeça #{team.seedRank || 1}
+                          </span>
+                        )}
+                        {/* Dupla Payment Status Indicator */}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border flex-shrink-0 ${cardColorConfig.badge}`}>
+                          <cardColorConfig.icon className={`w-3 h-3 ${cardColorConfig.iconColor}`} />
+                          {cardColorConfig.label}
+                        </span>
+                      </div>
+                      <h3 className={`font-extrabold text-base sm:text-lg text-white font-display leading-tight transition-colors flex items-center gap-1.5 ${cardColorConfig.titleHover}`}>
+                        <span className="truncate">{team.displayName}</span>
+                        <ArrowUpRight className="w-4 h-4 text-white/50 group-hover:text-white transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0" />
                       </h3>
                       {team.city && (
-                        <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-3 h-3 text-amber-500/80" /> {team.city}
+                        <p className={`text-[11px] flex items-center gap-1 mt-0.5 truncate ${cardColorConfig.locationText}`}>
+                          <MapPin className="w-3 h-3 text-amber-400 flex-shrink-0" /> <span className="truncate">{team.city}</span>
                         </p>
                       )}
                     </div>
@@ -567,48 +632,50 @@ export default function TeamsManager({
                         if (onGoToPayments) onGoToPayments(team.id, 1);
                       }}
                       title="Ir direto para o pagamento do Atleta 1"
-                      className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80 hover:border-amber-500/50 hover:bg-slate-900/90 transition-all flex items-center justify-between gap-2 cursor-pointer group/athlete"
+                      className={`p-2.5 rounded-xl transition-all flex items-center justify-between gap-2 cursor-pointer group/athlete ${cardColorConfig.athleteBox}`}
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="w-5 h-5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-[10px] flex items-center justify-center flex-shrink-0">
-                            1
-                          </span>
-                          <p className="text-xs font-bold text-slate-200 group-hover/athlete:text-amber-300 transition-colors truncate">
-                            {team.player1?.name}
-                            {team.player1?.nickname && (
-                              <span className="text-amber-400 ml-1 font-normal">"{team.player1?.nickname}"</span>
-                            )}
-                          </p>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={`w-5 h-5 rounded border font-bold text-[10px] flex items-center justify-center flex-shrink-0 ${cardColorConfig.athleteP1Index}`}>
+                              1
+                            </span>
+                            <p className="text-xs font-bold text-white transition-colors truncate">
+                              {team.player1?.name}
+                              {team.player1?.nickname && (
+                                <span className="text-amber-300 ml-1 font-normal">"{team.player1?.nickname}"</span>
+                              )}
+                            </p>
+                          </div>
 
                           {/* Athlete 1 Payment Indicator Badge */}
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border ${
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border flex-shrink-0 whitespace-nowrap ${
                             p1Pay.status === 'PAID_FULL' 
                               ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                               : p1Pay.status === 'EXEMPT'
                               ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                              : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                              : 'bg-rose-500/20 text-rose-300 border-rose-500/35'
                           }`}>
                             {p1Pay.status === 'PAID_FULL' ? (
                               <><CheckCircle2 className="w-3 h-3 text-emerald-400" /> Pago (R$ {p1Pay.amount})</>
                             ) : p1Pay.status === 'EXEMPT' ? (
-                              <><ShieldCheck className="w-3 h-3 text-purple-400" /> Isento (R$ 0,00 • Não Cobrar)</>
+                              <><ShieldCheck className="w-3 h-3 text-purple-400" /> Isento</>
                             ) : (
-                              <><Clock className="w-3 h-3 text-amber-400" /> Pendente</>
+                              <><AlertCircle className="w-3 h-3 text-rose-400" /> Pendente</>
                             )}
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
+                        <div className="flex items-center gap-2 mt-1 text-[10px] text-white/70">
                           {team.player1?.instagram && (
-                            <span className="text-pink-400 flex items-center gap-0.5">
-                              <AtSign className="w-2.5 h-2.5" />
-                              {team.player1?.instagram}
+                            <span className="text-pink-300 flex items-center gap-0.5 truncate">
+                              <AtSign className="w-2.5 h-2.5 flex-shrink-0" />
+                              <span className="truncate">{team.player1?.instagram}</span>
                             </span>
                           )}
                           {team.player1?.shirtSize && (
-                            <span className="flex items-center gap-0.5 text-slate-400">
-                              <Shirt className="w-2.5 h-2.5 text-slate-500" /> Camisa {team.player1?.shirtSize}
+                            <span className="flex items-center gap-0.5 text-white/70 flex-shrink-0">
+                              <Shirt className="w-2.5 h-2.5 text-white/50" /> Camisa {team.player1?.shirtSize}
                             </span>
                           )}
                         </div>
@@ -621,7 +688,7 @@ export default function TeamsManager({
                           rel="noreferrer"
                           onClick={(e) => e.stopPropagation()}
                           title="Conversar no WhatsApp"
-                          className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-colors flex-shrink-0"
+                          className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition-colors flex-shrink-0"
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
                         </a>
@@ -635,50 +702,52 @@ export default function TeamsManager({
                         if (onGoToPayments) onGoToPayments(team.id, 2);
                       }}
                       title="Ir direto para o pagamento do Atleta 2"
-                      className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/60 hover:border-cyan-500/50 hover:bg-slate-900/90 transition-all flex items-center justify-between gap-2 cursor-pointer group/athlete"
+                      className={`p-2.5 rounded-xl transition-all flex items-center justify-between gap-2 cursor-pointer group/athlete ${cardColorConfig.athleteBox}`}
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="w-5 h-5 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-bold text-[10px] flex items-center justify-center flex-shrink-0">
-                            2
-                          </span>
-                          <p className="text-xs font-bold text-slate-200 group-hover/athlete:text-cyan-300 transition-colors truncate">
-                            {team.player2?.name}
-                            {team.player2?.nickname && (
-                              <span className="text-amber-400 ml-1 font-normal">"{team.player2?.nickname}"</span>
-                            )}
-                          </p>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={`w-5 h-5 rounded border font-bold text-[10px] flex items-center justify-center flex-shrink-0 ${cardColorConfig.athleteP2Index}`}>
+                              2
+                            </span>
+                            <p className="text-xs font-bold text-white transition-colors truncate">
+                              {team.player2?.name}
+                              {team.player2?.nickname && (
+                                <span className="text-amber-300 ml-1 font-normal">"{team.player2?.nickname}"</span>
+                              )}
+                            </p>
+                          </div>
 
                           {/* Athlete 2 Payment Indicator Badge */}
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border ${
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border flex-shrink-0 whitespace-nowrap ${
                             p2Pay.status === 'PAID_FULL' 
                               ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                               : p2Pay.status === 'EXEMPT'
                               ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                              : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                              : 'bg-rose-500/20 text-rose-300 border-rose-500/35'
                           }`}>
                             {p2Pay.status === 'PAID_FULL' ? (
                               <><CheckCircle2 className="w-3 h-3 text-emerald-400" /> Pago (R$ {p2Pay.amount})</>
                             ) : p2Pay.status === 'PAID_HALF' ? (
                               <><Clock className="w-3 h-3 text-cyan-400" /> 50% (R$ {p2Pay.amount})</>
                             ) : p2Pay.status === 'EXEMPT' ? (
-                              <><ShieldCheck className="w-3 h-3 text-purple-400" /> Isento (R$ 0,00 • Não Cobrar)</>
+                              <><ShieldCheck className="w-3 h-3 text-purple-400" /> Isento</>
                             ) : (
-                              <><Clock className="w-3 h-3 text-amber-400" /> Pendente</>
+                              <><AlertCircle className="w-3 h-3 text-rose-400" /> Pendente</>
                             )}
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
+                        <div className="flex items-center gap-2 mt-1 text-[10px] text-white/70">
                           {team.player2?.instagram && (
-                            <span className="text-pink-400 flex items-center gap-0.5">
-                              <AtSign className="w-2.5 h-2.5" />
-                              {team.player2?.instagram}
+                            <span className="text-pink-300 flex items-center gap-0.5 truncate">
+                              <AtSign className="w-2.5 h-2.5 flex-shrink-0" />
+                              <span className="truncate">{team.player2?.instagram}</span>
                             </span>
                           )}
                           {team.player2?.shirtSize && (
-                            <span className="flex items-center gap-0.5 text-slate-400">
-                              <Shirt className="w-2.5 h-2.5 text-slate-500" /> Camisa {team.player2?.shirtSize}
+                            <span className="flex items-center gap-0.5 text-white/70 flex-shrink-0">
+                              <Shirt className="w-2.5 h-2.5 text-white/50" /> Camisa {team.player2?.shirtSize}
                             </span>
                           )}
                         </div>
@@ -691,7 +760,7 @@ export default function TeamsManager({
                           rel="noreferrer"
                           onClick={(e) => e.stopPropagation()}
                           title="Conversar no WhatsApp"
-                          className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-colors flex-shrink-0"
+                          className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition-colors flex-shrink-0"
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
                         </a>
@@ -702,15 +771,15 @@ export default function TeamsManager({
 
                 {/* Footer Controls & Payment Toggle */}
                 <div 
-                  className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between gap-2"
+                  className={`mt-4 pt-3 border-t flex items-center justify-between gap-2 ${cardColorConfig.footerBorder}`}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
                     onClick={() => onGoToPayments && onGoToPayments(team.id, 1)}
                     title="Ir para o Financeiro desta dupla"
-                    className="px-2.5 py-1.5 rounded-lg text-xs font-bold border flex items-center gap-1.5 transition-all bg-slate-900 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20 active:scale-95"
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border flex items-center gap-1.5 transition-all shadow-sm active:scale-95 ${cardColorConfig.financeBtn}`}
                   >
-                    <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+                    <CreditCard className="w-3.5 h-3.5" />
                     <span>Financeiro</span>
                   </button>
 
@@ -718,21 +787,21 @@ export default function TeamsManager({
                     <button
                       onClick={() => setSharePreviewTeam(team)}
                       title="Gerar Card Social da Dupla"
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-400 transition-colors"
+                      className={`p-1.5 rounded-lg transition-colors ${cardColorConfig.actionBtn}`}
                     >
                       <Share2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleOpenEdit(team)}
                       title="Editar Dupla"
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                      className={`p-1.5 rounded-lg transition-colors ${cardColorConfig.actionBtn}`}
                     >
                       <Edit3 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteTeam(team.id, team.displayName)}
                       title="Excluir Dupla"
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition-colors"
+                      className="p-1.5 rounded-lg bg-rose-950/60 border border-rose-800/70 hover:bg-rose-900 text-rose-300 hover:text-white transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

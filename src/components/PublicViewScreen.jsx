@@ -22,7 +22,7 @@ import PublicRegistrationModal from './PublicRegistrationModal';
 // ─── Tab IDs ────────────────────────────────────────────────────────────────
 const TABS = [
   { id: 'teams',    label: 'Duplas Inscritas', icon: Users },
-  { id: 'bracket',  label: 'Chaveamento',      icon: GitBranch },
+  { id: 'bracket',  label: 'Jogos',            icon: GitBranch },
   { id: 'schedule', label: 'Programação',      icon: Calendar },
 ];
 

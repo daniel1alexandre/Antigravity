@@ -12,12 +12,20 @@ import ReportsCenter from './components/ReportsCenter';
 import DrawModal from './components/DrawModal';
 import SettingsBackupModal from './components/SettingsBackupModal';
 import CreateTournamentModal from './components/CreateTournamentModal';
+import TournamentManagerModal from './components/TournamentManagerModal';
 import LoginScreen from './components/LoginScreen';
 import UserManagerModal from './components/UserManagerModal';
 import ScheduleManager from './components/ScheduleManager';
 import PublicViewScreen from './components/PublicViewScreen';
 
-import { loadTournamentData, saveTournamentData, createNewTournament } from './utils/storage';
+import { 
+  loadTournamentData, 
+  saveTournamentData, 
+  createNewTournament,
+  clearTournamentData,
+  deleteTournament,
+  switchActiveTournament
+} from './utils/storage';
 import { updateMatchScore } from './utils/doubleEliminationEngine';
 import { getCurrentUser, logout } from './utils/auth';
 import { Eye, Lock } from 'lucide-react';
@@ -31,8 +39,10 @@ export default function App() {
   const [publicView, setPublicView] = useState(null);
   const isReadOnly = !currentUser;
 
-  // Main State
+  // Main State & Tournaments
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [tournaments, setTournaments] = useState([]);
+  const [activeTournamentId, setActiveTournamentId] = useState('');
   const [eventInfo, setEventInfo] = useState(null);
   const [categories, setCategories] = useState([]);
   const [teams, setTeams] = useState([]);
@@ -42,6 +52,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('teams');
 
   // Modals & Overlay States
+  const [isTournamentManagerOpen, setIsTournamentManagerOpen] = useState(false);
   const [isCreateTournamentModalOpen, setIsCreateTournamentModalOpen] = useState(false);
   const [isAddTeamModalOpen, setIsAddTeamModalOpen] = useState(false);
   const [isDrawModalOpen, setIsDrawModalOpen] = useState(false);
@@ -55,13 +66,13 @@ export default function App() {
 
   // Navigate directly from Duplas / Card to specific athlete in Financial Control
   const handleNavigateToPaymentAthlete = (teamId, playerNum = 1) => {
-    setTargetPaymentAthlete({ teamId, playerNum });
+    setTargetPaymentAthlete({ teamId, playerNum, timestamp: Date.now() });
     setActiveTab('payments');
 
-    // Clear highlight after a few seconds
+    // Clear highlight after 15 seconds
     setTimeout(() => {
       setTargetPaymentAthlete(null);
-    }, 4500);
+    }, 15000);
   };
 
   // Navigate directly from Telão / Próxima Chamada to Bracket Match
@@ -88,12 +99,14 @@ export default function App() {
   // Initial Load from Storage
   useEffect(() => {
     const loaded = loadTournamentData();
+    setTournaments(loaded.tournaments || []);
+    setActiveTournamentId(loaded.activeTournamentId || '');
     setEventInfo(loaded.eventInfo);
-    setCategories(loaded.categories);
-    setTeams(loaded.teams);
-    setBrackets(loaded.brackets);
+    setCategories(loaded.categories || []);
+    setTeams(loaded.teams || []);
+    setBrackets(loaded.brackets || {});
 
-    if (loaded.categories.length > 0) {
+    if (loaded.categories && loaded.categories.length > 0) {
       setSelectedCategoryId(loaded.categories[0].id);
     } else {
       setSelectedCategoryId('');
@@ -101,27 +114,121 @@ export default function App() {
     setDataLoaded(true);
   }, []);
 
-  // Save to Storage on changes
+  // Save to Storage on changes for current active tournament
   useEffect(() => {
-    if (!dataLoaded) return;
-    saveTournamentData({
-      eventInfo,
-      categories,
-      teams,
-      brackets,
-    });
-  }, [eventInfo, categories, teams, brackets, dataLoaded]);
+    if (!dataLoaded || !activeTournamentId) return;
+    saveTournamentData(
+      {
+        eventInfo,
+        categories,
+        teams,
+        brackets,
+      },
+      activeTournamentId
+    );
 
-  // Create clean tournament from scratch
+    // Atualiza também a lista em memória
+    setTournaments((prev) =>
+      prev.map((t) =>
+        t.id === activeTournamentId
+          ? {
+              ...t,
+              eventInfo: eventInfo || t.eventInfo,
+              categories: categories || [],
+              teams: teams || [],
+              brackets: brackets || {},
+              updatedAt: new Date().toISOString(),
+            }
+          : t
+      )
+    );
+  }, [eventInfo, categories, teams, brackets, dataLoaded, activeTournamentId]);
+
+  // Create clean tournament from scratch without altering existing tournaments
   const handleCreateNewTournament = (tournamentInfo) => {
-    const clean = createNewTournament(tournamentInfo);
-    setEventInfo(clean.eventInfo);
+    const result = createNewTournament(tournamentInfo);
+    setTournaments(result.tournaments);
+    setActiveTournamentId(result.activeTournamentId);
+    setEventInfo(result.eventInfo);
     setCategories([]);
     setTeams([]);
     setBrackets({});
     setSelectedCategoryId('');
     setActiveTab('categories');
     setIsCreateTournamentModalOpen(false);
+  };
+
+  // Switch to another tournament
+  const handleSelectTournament = (tournamentId) => {
+    if (tournamentId === activeTournamentId) return;
+    const target = tournaments.find((t) => t.id === tournamentId);
+    if (!target) return;
+
+    switchActiveTournament(tournamentId);
+    setActiveTournamentId(tournamentId);
+    setEventInfo(target.eventInfo);
+    setCategories(target.categories || []);
+    setTeams(target.teams || []);
+    setBrackets(target.brackets || {});
+
+    if (target.categories && target.categories.length > 0) {
+      setSelectedCategoryId(target.categories[0].id);
+    } else {
+      setSelectedCategoryId('');
+    }
+    setActiveTab('teams');
+  };
+
+  // Clear tournament data keeping only categories
+  const handleClearTournament = (tournamentId) => {
+    const target = tournaments.find((t) => t.id === tournamentId);
+    const tournName = target?.eventInfo?.name || 'Torneio';
+    
+    // Pergunta de confirmação adicional para segurança
+    const confirmed = window.confirm(
+      `Deseja realmente limpar todos os dados do torneio "${tournName}"?\n\nTodas as duplas inscritas, chaveamentos e placares serão apagados.\nAs categorias cadastradas serão MANTIDAS intactas.`
+    );
+    if (!confirmed) return;
+
+    const result = clearTournamentData(tournamentId);
+    setTournaments(result.tournaments);
+
+    if (tournamentId === activeTournamentId && result.clearedTournament) {
+      setTeams([]);
+      setBrackets({});
+      setEventInfo(result.clearedTournament.eventInfo);
+      if (result.clearedTournament.categories && result.clearedTournament.categories.length > 0) {
+        setSelectedCategoryId(result.clearedTournament.categories[0].id);
+      }
+    }
+  };
+
+  // Delete a tournament
+  const handleDeleteTournament = (tournamentId) => {
+    const target = tournaments.find((t) => t.id === tournamentId);
+    const tournName = target?.eventInfo?.name || 'Torneio';
+
+    const confirmed = window.confirm(
+      `Tem certeza que deseja excluir permanentemente o torneio "${tournName}"?\nEsta ação não poderá ser desfeita.`
+    );
+    if (!confirmed) return;
+
+    const result = deleteTournament(tournamentId);
+    setTournaments(result.tournaments);
+
+    if (tournamentId === activeTournamentId || result.activeTournamentId !== activeTournamentId) {
+      setActiveTournamentId(result.activeTournamentId);
+      setEventInfo(result.activeTournament.eventInfo);
+      setCategories(result.activeTournament.categories || []);
+      setTeams(result.activeTournament.teams || []);
+      setBrackets(result.activeTournament.brackets || {});
+
+      if (result.activeTournament.categories && result.activeTournament.categories.length > 0) {
+        setSelectedCategoryId(result.activeTournament.categories[0].id);
+      } else {
+        setSelectedCategoryId('');
+      }
+    }
   };
 
   if (!dataLoaded) {
@@ -288,6 +395,12 @@ export default function App() {
         categories={categories}
         selectedCategoryId={selectedCategoryId}
         setSelectedCategoryId={setSelectedCategoryId}
+        tournaments={tournaments}
+        activeTournamentId={activeTournamentId}
+        onSelectTournament={handleSelectTournament}
+        onOpenTournamentManager={() => setIsTournamentManagerOpen(true)}
+        onClearTournament={handleClearTournament}
+        onDeleteTournament={handleDeleteTournament}
         onOpenNewTournamentModal={() => {
           if (isReadOnly) {
             setIsLoginModalOpen(true);
@@ -461,6 +574,19 @@ export default function App() {
       {/* ============================================================ */}
       {/* GLOBAL MODALS */}
       {/* ============================================================ */}
+
+      {/* Tournament Manager Modal */}
+      <TournamentManagerModal
+        isOpen={isTournamentManagerOpen}
+        onClose={() => setIsTournamentManagerOpen(false)}
+        tournaments={tournaments}
+        activeTournamentId={activeTournamentId}
+        onSelectTournament={handleSelectTournament}
+        onClearTournament={handleClearTournament}
+        onDeleteTournament={handleDeleteTournament}
+        onOpenCreateModal={() => setIsCreateTournamentModalOpen(true)}
+        isReadOnly={isReadOnly}
+      />
 
       {/* Create New Clean Tournament Modal */}
       <CreateTournamentModal

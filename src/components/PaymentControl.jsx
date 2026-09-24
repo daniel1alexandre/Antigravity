@@ -22,7 +22,8 @@ import {
   ArrowUpRight,
   Sparkles,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  X
 } from 'lucide-react';
 import { PAYMENT_STATUS, PAYMENT_METHODS, getAthletePayment } from '../types/tournament';
 
@@ -71,9 +72,17 @@ export default function PaymentControl({
   const expensesList = Array.isArray(eventInfo?.expenses) ? eventInfo.expenses : [];
   const sponsorsList = Array.isArray(eventInfo?.sponsors) ? eventInfo.sponsors : [];
 
-  // Auto-scroll and focus specific athlete row when navigated from Duplas
+  // Local state for visually highlighting targeted team & athlete
+  const [highlightedAthlete, setHighlightedAthlete] = useState(null); // { teamId, playerNum }
+
+  // Track active focused/editing amount field to clear it immediately on click/focus
+  const [activeInputKey, setActiveInputKey] = useState(null); // `${teamId}-${playerNum}`
+  const [activeInputValue, setActiveInputValue] = useState('');
+
+  // Auto-scroll, highlight, and focus specific athlete payment input when navigated from Duplas
   useEffect(() => {
     if (targetPaymentAthlete?.teamId) {
+      setHighlightedAthlete(targetPaymentAthlete);
       setActiveSubTab('registrations');
       const targetTeam = teams.find(t => t.id === targetPaymentAthlete.teamId);
       if (targetTeam && selectedCategoryFilter !== 'ALL' && selectedCategoryFilter !== targetTeam.categoryId) {
@@ -82,13 +91,30 @@ export default function PaymentControl({
       setSelectedStatusFilter('ALL');
       setSearchTerm('');
 
-      setTimeout(() => {
-        const elementId = `athlete-row-${targetPaymentAthlete.teamId}-${targetPaymentAthlete.playerNum || 1}`;
-        const targetElement = document.getElementById(elementId) || document.getElementById(`team-header-${targetPaymentAthlete.teamId}`);
+      const focusTimer = setTimeout(() => {
+        const rowId = `athlete-row-${targetPaymentAthlete.teamId}-${targetPaymentAthlete.playerNum || 1}`;
+        const targetElement = document.getElementById(rowId) || document.getElementById(`team-header-${targetPaymentAthlete.teamId}`);
         if (targetElement) {
           targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-      }, 250);
+
+        const inputId = `athlete-amount-input-${targetPaymentAthlete.teamId}-${targetPaymentAthlete.playerNum || 1}`;
+        const targetInput = document.getElementById(inputId);
+        if (targetInput) {
+          targetInput.focus();
+          targetInput.select();
+        }
+      }, 300);
+
+      // Keep highlight active for 15 seconds
+      const clearTimer = setTimeout(() => {
+        setHighlightedAthlete(null);
+      }, 15000);
+
+      return () => {
+        clearTimeout(focusTimer);
+        clearTimeout(clearTimer);
+      };
     }
   }, [targetPaymentAthlete, teams]);
 
@@ -119,7 +145,11 @@ export default function PaymentControl({
       totalExemptValue += p1.fee;
     } else if (p1.status === 'PAID_FULL') {
       totalPaidAthletes++;
-      totalCollectedRegistrations += Number(p1.amount) || p1.fee;
+      const paid = (p1.amount !== undefined && p1.amount !== null && !isNaN(p1.amount)) ? Number(p1.amount) : p1.fee;
+      totalCollectedRegistrations += paid;
+      if (paid < p1.fee) {
+        totalPendingRegistrations += (p1.fee - paid);
+      }
     } else {
       totalPendingAthletes++;
       const paid = Number(p1.amount) || 0;
@@ -134,7 +164,11 @@ export default function PaymentControl({
       totalExemptValue += p2.fee;
     } else if (p2.status === 'PAID_FULL') {
       totalPaidAthletes++;
-      totalCollectedRegistrations += Number(p2.amount) || p2.fee;
+      const paid = (p2.amount !== undefined && p2.amount !== null && !isNaN(p2.amount)) ? Number(p2.amount) : p2.fee;
+      totalCollectedRegistrations += paid;
+      if (paid < p2.fee) {
+        totalPendingRegistrations += (p2.fee - paid);
+      }
     } else {
       totalPendingAthletes++;
       const paid = Number(p2.amount) || 0;
@@ -249,15 +283,23 @@ export default function PaymentControl({
 
   const handleAthleteStatusChange = (teamId, playerNum, newStatus, entryFee) => {
     const athleteFee = Math.round((entryFee || 140) / 2);
-    let amount = 0;
-    if (newStatus === 'PAID_FULL') amount = athleteFee;
-    else if (newStatus === 'EXEMPT') amount = 0;
-    else if (newStatus === 'PENDING') amount = 0;
+    const targetTeam = teams.find(t => t.id === teamId);
+    const currentPay = targetTeam ? getAthletePayment(targetTeam, playerNum, entryFee) : null;
+    const currentAmount = currentPay ? (Number(currentPay.amount) || 0) : 0;
+
+    let amount = currentAmount;
+    if (newStatus === 'PAID_FULL') {
+      amount = currentAmount > 0 ? currentAmount : athleteFee;
+    } else if (newStatus === 'EXEMPT') {
+      amount = 0;
+    } else if (newStatus === 'PENDING') {
+      amount = 0;
+    }
 
     updateAthletePayment(teamId, playerNum, {
       status: newStatus,
       amount,
-      date: newStatus === 'PAID_FULL' ? new Date().toISOString().slice(0, 10) : null,
+      date: newStatus === 'PAID_FULL' ? (currentPay?.date || new Date().toISOString().slice(0, 10)) : null,
     });
   };
 
@@ -734,6 +776,56 @@ export default function PaymentControl({
             </div>
           </div>
 
+          {/* Highlight Banner when targeted from Duplas */}
+          {highlightedAthlete && (
+            <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-amber-500/25 via-amber-500/15 to-slate-900 border border-amber-500/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shadow-glow-amber animate-in fade-in">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400 text-amber-300 flex items-center justify-center flex-shrink-0 animate-bounce">
+                  <Sparkles className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-amber-300 uppercase tracking-wider text-[11px]">
+                      Dupla Selecionada para Pagamento
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-200 border border-amber-500/40">
+                      Atleta #{highlightedAthlete.playerNum || 1}
+                    </span>
+                  </div>
+                  <p className="text-white font-bold text-sm mt-0.5">
+                    {teams.find(t => t.id === highlightedAthlete.teamId)?.displayName || 'Dupla Selecionada'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const inputId = `athlete-amount-input-${highlightedAthlete.teamId}-${highlightedAthlete.playerNum || 1}`;
+                    const inp = document.getElementById(inputId);
+                    if (inp) {
+                      inp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      inp.focus();
+                      inp.select();
+                    }
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-glow-amber transition-all active:scale-95 flex items-center gap-1.5"
+                >
+                  <DollarSign className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Digitar Valor</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHighlightedAthlete(null)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  title="Fechar destaque"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Table Container */}
           <div className="glass-panel rounded-2xl overflow-hidden border border-slate-800">
             {/* Table Header Controls */}
@@ -814,16 +906,35 @@ export default function PaymentControl({
                       const p1Payment = getAthletePayment(team, 1, entryFee);
                       const p2Payment = getAthletePayment(team, 2, entryFee);
 
+                      const isTeamHighlighted = highlightedAthlete?.teamId === team.id;
+                      const isP1Highlighted = isTeamHighlighted && (highlightedAthlete?.playerNum === 1 || !highlightedAthlete?.playerNum);
+                      const isP2Highlighted = isTeamHighlighted && highlightedAthlete?.playerNum === 2;
+
                       return (
                         <React.Fragment key={team.id}>
                           {/* Dupla Header Row */}
-                          <tr id={`team-header-${team.id}`} className="bg-slate-900/50 font-bold border-t border-slate-800">
+                          <tr 
+                            id={`team-header-${team.id}`} 
+                            className={`font-bold border-t transition-all duration-300 ${
+                              isTeamHighlighted
+                                ? 'bg-gradient-to-r from-amber-500/35 via-amber-500/15 to-slate-900 border-l-4 border-l-amber-400 border-t-amber-500/60 border-b-amber-500/40 shadow-lg shadow-amber-500/10 ring-1 ring-amber-400/40'
+                                : 'bg-slate-900/50 border-slate-800'
+                            }`}
+                          >
                             <td colSpan="7" className="py-2.5 px-4 text-slate-300">
                               <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat?.color || '#F59E0B' }} />
-                                  <span className="text-white text-xs sm:text-sm font-display">{team.displayName}</span>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cat?.color || '#F59E0B' }} />
+                                  <span className={`text-xs sm:text-sm font-display ${isTeamHighlighted ? 'text-amber-200 font-extrabold' : 'text-white'}`}>
+                                    {team.displayName}
+                                  </span>
                                   <span className="text-[11px] font-normal text-slate-400">({team.city || 'Sem cidade'})</span>
+                                  {isTeamHighlighted && (
+                                    <span className="flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-500/30 text-amber-300 border border-amber-400 shadow-glow-amber animate-pulse">
+                                      <Sparkles className="w-3 h-3 text-amber-300" />
+                                      DUPLA SELECIONADA
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-[11px] font-semibold text-slate-400">
                                   Inscrição da Dupla: <strong className="text-emerald-400">R$ {entryFee}</strong> • Total Pago: <strong className="text-amber-400">R$ {(Number(p1Payment.amount) || 0) + (Number(p2Payment.amount) || 0)}</strong>
@@ -833,14 +944,29 @@ export default function PaymentControl({
                           </tr>
 
                           {/* Player 1 Row */}
-                          <tr id={`athlete-row-${team.id}-1`} className="hover:bg-slate-800/30 transition-colors">
+                          <tr 
+                            id={`athlete-row-${team.id}-1`} 
+                            className={`transition-all duration-300 ${
+                              isP1Highlighted
+                                ? 'bg-amber-500/20 border-l-4 border-l-amber-400 ring-1 ring-amber-400/40'
+                                : isTeamHighlighted
+                                ? 'bg-amber-500/10 border-l-4 border-l-amber-400/60'
+                                : 'hover:bg-slate-800/30'
+                            }`}
+                          >
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-2.5 pl-3">
-                                <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center font-bold text-[11px] text-amber-400">
+                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-[11px] transition-colors ${
+                                  isP1Highlighted
+                                    ? 'bg-amber-400 text-slate-950 font-black shadow-glow-amber'
+                                    : 'bg-slate-800 text-amber-400'
+                                }`}>
                                   #1
                                 </div>
                                 <div>
-                                  <p className="font-bold text-slate-200">{team.player1?.name || 'Jogador 1'}</p>
+                                  <p className={`font-bold ${isP1Highlighted ? 'text-amber-200' : 'text-slate-200'}`}>
+                                    {team.player1?.name || 'Jogador 1'}
+                                  </p>
                                   <p className="text-[11px] text-slate-500">{team.player1?.phone || 'Sem fone'}</p>
                                 </div>
                               </div>
@@ -850,13 +976,55 @@ export default function PaymentControl({
                             <td className="py-3 px-3 font-semibold text-slate-300">R$ {p1Payment.fee}</td>
 
                             <td className="py-3 px-3">
-                              <input
-                                type="number"
-                                disabled={isReadOnly}
-                                value={p1Payment.amount}
-                                onChange={(e) => updateAthletePayment(team.id, 1, { amount: Number(e.target.value) })}
-                                className="w-20 px-2 py-1 rounded bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500 font-bold disabled:opacity-60 disabled:cursor-not-allowed"
-                              />
+                              <div className="relative w-28">
+                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 pointer-events-none">
+                                  R$
+                                </span>
+                                <input
+                                  id={`athlete-amount-input-${team.id}-1`}
+                                  type="number"
+                                  disabled={isReadOnly}
+                                  value={
+                                    activeInputKey === `${team.id}-1` 
+                                      ? activeInputValue 
+                                      : (p1Payment.amount === 0 ? '' : p1Payment.amount)
+                                  }
+                                  placeholder="0"
+                                  onFocus={() => {
+                                    setActiveInputKey(`${team.id}-1`);
+                                    setActiveInputValue('');
+                                  }}
+                                  onClick={() => {
+                                    setActiveInputKey(`${team.id}-1`);
+                                    setActiveInputValue('');
+                                  }}
+                                  onBlur={() => {
+                                    if (activeInputKey === `${team.id}-1` && activeInputValue === '') {
+                                      updateAthletePayment(team.id, 1, {
+                                        amount: 0,
+                                        status: 'PENDING',
+                                        date: null,
+                                      });
+                                    }
+                                    setActiveInputKey(null);
+                                  }}
+                                  onChange={(e) => {
+                                    const raw = e.target.value;
+                                    setActiveInputValue(raw);
+                                    const val = raw === '' ? 0 : Number(raw);
+                                    updateAthletePayment(team.id, 1, {
+                                      amount: val,
+                                      status: val > 0 ? 'PAID_FULL' : (p1Payment.status === 'EXEMPT' ? 'EXEMPT' : 'PENDING'),
+                                      date: val > 0 ? (p1Payment.date || new Date().toISOString().slice(0, 10)) : null,
+                                    });
+                                  }}
+                                  className={`w-full pl-7 pr-2 py-1.5 rounded-xl border text-xs text-white focus:outline-none font-bold disabled:opacity-60 disabled:cursor-not-allowed transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                                    isP1Highlighted
+                                      ? 'bg-amber-500/30 border-amber-400 ring-2 ring-amber-400 text-amber-200 shadow-glow-amber'
+                                      : 'bg-slate-950 border-slate-700 focus:border-amber-500'
+                                  }`}
+                                />
+                              </div>
                             </td>
 
                             <td className="py-3 px-3">
@@ -921,14 +1089,29 @@ export default function PaymentControl({
                           </tr>
 
                           {/* Player 2 Row */}
-                          <tr id={`athlete-row-${team.id}-2`} className="hover:bg-slate-800/30 transition-colors">
+                          <tr 
+                            id={`athlete-row-${team.id}-2`} 
+                            className={`transition-all duration-300 ${
+                              isP2Highlighted
+                                ? 'bg-amber-500/20 border-l-4 border-l-amber-400 ring-1 ring-amber-400/40'
+                                : isTeamHighlighted
+                                ? 'bg-amber-500/10 border-l-4 border-l-amber-400/60'
+                                : 'hover:bg-slate-800/30'
+                            }`}
+                          >
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-2.5 pl-3">
-                                <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center font-bold text-[11px] text-amber-400">
+                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-[11px] transition-colors ${
+                                  isP2Highlighted
+                                    ? 'bg-amber-400 text-slate-950 font-black shadow-glow-amber'
+                                    : 'bg-slate-800 text-amber-400'
+                                }`}>
                                   #2
                                 </div>
                                 <div>
-                                  <p className="font-bold text-slate-200">{team.player2?.name || 'Jogador 2'}</p>
+                                  <p className={`font-bold ${isP2Highlighted ? 'text-amber-200' : 'text-slate-200'}`}>
+                                    {team.player2?.name || 'Jogador 2'}
+                                  </p>
                                   <p className="text-[11px] text-slate-500">{team.player2?.phone || 'Sem fone'}</p>
                                 </div>
                               </div>
@@ -938,13 +1121,55 @@ export default function PaymentControl({
                             <td className="py-3 px-3 font-semibold text-slate-300">R$ {p2Payment.fee}</td>
 
                             <td className="py-3 px-3">
-                              <input
-                                type="number"
-                                disabled={isReadOnly}
-                                value={p2Payment.amount}
-                                onChange={(e) => updateAthletePayment(team.id, 2, { amount: Number(e.target.value) })}
-                                className="w-20 px-2 py-1 rounded bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500 font-bold disabled:opacity-60 disabled:cursor-not-allowed"
-                              />
+                              <div className="relative w-28">
+                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 pointer-events-none">
+                                  R$
+                                </span>
+                                <input
+                                  id={`athlete-amount-input-${team.id}-2`}
+                                  type="number"
+                                  disabled={isReadOnly}
+                                  value={
+                                    activeInputKey === `${team.id}-2` 
+                                      ? activeInputValue 
+                                      : (p2Payment.amount === 0 ? '' : p2Payment.amount)
+                                  }
+                                  placeholder="0"
+                                  onFocus={() => {
+                                    setActiveInputKey(`${team.id}-2`);
+                                    setActiveInputValue('');
+                                  }}
+                                  onClick={() => {
+                                    setActiveInputKey(`${team.id}-2`);
+                                    setActiveInputValue('');
+                                  }}
+                                  onBlur={() => {
+                                    if (activeInputKey === `${team.id}-2` && activeInputValue === '') {
+                                      updateAthletePayment(team.id, 2, {
+                                        amount: 0,
+                                        status: 'PENDING',
+                                        date: null,
+                                      });
+                                    }
+                                    setActiveInputKey(null);
+                                  }}
+                                  onChange={(e) => {
+                                    const raw = e.target.value;
+                                    setActiveInputValue(raw);
+                                    const val = raw === '' ? 0 : Number(raw);
+                                    updateAthletePayment(team.id, 2, {
+                                      amount: val,
+                                      status: val > 0 ? 'PAID_FULL' : (p2Payment.status === 'EXEMPT' ? 'EXEMPT' : 'PENDING'),
+                                      date: val > 0 ? (p2Payment.date || new Date().toISOString().slice(0, 10)) : null,
+                                    });
+                                  }}
+                                  className={`w-full pl-7 pr-2 py-1.5 rounded-xl border text-xs text-white focus:outline-none font-bold disabled:opacity-60 disabled:cursor-not-allowed transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                                    isP2Highlighted
+                                      ? 'bg-amber-500/30 border-amber-400 ring-2 ring-amber-400 text-amber-200 shadow-glow-amber'
+                                      : 'bg-slate-950 border-slate-700 focus:border-amber-500'
+                                  }`}
+                                />
+                              </div>
                             </td>
 
                             <td className="py-3 px-3">

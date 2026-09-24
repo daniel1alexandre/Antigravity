@@ -63,15 +63,10 @@ function buildDaySchedule({
   courtSwitchDuration,
   activeCourts,
   categoryCourtsConfig,
-  lunchEnabled,
-  lunchStart,
-  lunchDuration,
   startMatchCounter = 1,
 }) {
   const slot = Number(matchDuration) + Number(warmupDuration) + Number(courtSwitchDuration);
   const startMins = timeToMinutes(startTime);
-  const lunchStartMins = lunchEnabled ? timeToMinutes(lunchStart) : null;
-  const lunchEndMins = lunchEnabled && lunchStartMins !== null ? lunchStartMins + Number(lunchDuration) : null;
   const n = Math.max(activeCourts.length, 1);
   const free = new Array(n).fill(startMins);
   const all = [];
@@ -93,9 +88,6 @@ function buildDaySchedule({
         if (free[x] < ef) { ef = free[x]; ci = x; }
       }
       let s = ef;
-      if (lunchEnabled && lunchStartMins && lunchEndMins && s < lunchEndMins && s + slot > lunchStartMins) {
-        s = lunchEndMins;
-      }
       const co = activeCourts[ci] || { id: `court-${ci + 1}`, name: `Quadra ${ci + 1}` };
       all.push({
         ...item,
@@ -723,9 +715,6 @@ export default function ScheduleManager({
     : [{ id: 'court-1', name: 'Quadra 1' }, { id: 'court-2', name: 'Quadra 2' }];
 
   const [selectedCourtIds, setSelectedCourtIds] = useState(savedConfig.selectedCourtIds || allCourts.map(c => c.id));
-  const [lunchEnabled, setLunchEnabled] = useState(savedConfig.lunchBreak?.enabled || false);
-  const [lunchStart, setLunchStart] = useState(savedConfig.lunchBreak?.startTime || '12:30');
-  const [lunchDuration, setLunchDuration] = useState(savedConfig.lunchBreak?.duration || 45);
   const [categoryCourtsConfig, setCategoryCourtsConfig] = useState(savedConfig.categoryCourtsConfig || {});
 
   // ─── Multi-Day State Initialization ───
@@ -900,7 +889,6 @@ export default function ScheduleManager({
         categoryOrder: flattenedOrder,
         categoryCourtsConfig,
         days,
-        lunchBreak: { enabled: lunchEnabled, startTime: lunchStart, duration: Number(lunchDuration) },
       }
     }));
     setHasSavedNotice(true);
@@ -913,9 +901,6 @@ export default function ScheduleManager({
     warmupDuration,
     courtSwitchDuration,
     activeCourts,
-    lunchEnabled,
-    lunchStart,
-    lunchDuration,
   };
 
   // ─── Multi-Day Prévia Schedule ───
@@ -951,7 +936,7 @@ export default function ScheduleManager({
         return matchesList;
       },
     });
-  }, [days, categories, categoryCourtsConfig, matchDuration, warmupDuration, courtSwitchDuration, activeCourts, lunchEnabled, lunchStart, lunchDuration]);
+  }, [days, categories, categoryCourtsConfig, matchDuration, warmupDuration, courtSwitchDuration, activeCourts]);
 
   // ─── Multi-Day Oficial Schedule ───
   const oficialSchedule = useMemo(() => {
@@ -1022,7 +1007,7 @@ export default function ScheduleManager({
         return matchesList;
       },
     });
-  }, [days, categories, teams, brackets, categoryCourtsConfig, matchDuration, warmupDuration, courtSwitchDuration, activeCourts, lunchEnabled, lunchStart, lunchDuration]);
+  }, [days, categories, teams, brackets, categoryCourtsConfig, matchDuration, warmupDuration, courtSwitchDuration, activeCourts]);
 
   const subMenuTabs = [
     { id: 'config', label: 'Configuração da Programação', icon: Sliders },
@@ -1499,49 +1484,6 @@ export default function ScheduleManager({
                       );
                     })}
                   </div>
-                </div>
-
-                <div className="pt-2 border-t border-slate-800">
-                  <div className="flex items-center justify-between">
-                    <label className="text-slate-300 font-semibold flex items-center gap-1.5 cursor-pointer">
-                      <Coffee className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Pausa / Almoço</span>
-                    </label>
-                    <input
-                      type="checkbox"
-                      checked={lunchEnabled}
-                      onChange={e => setLunchEnabled(e.target.checked)}
-                      disabled={isReadOnly}
-                      className="accent-amber-500 w-4 h-4 cursor-pointer"
-                    />
-                  </div>
-                  {lunchEnabled && (
-                    <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-800/60">
-                      <div>
-                        <span className="text-[10px] text-slate-400 block mb-0.5">Início:</span>
-                        <input
-                          type="time"
-                          value={lunchStart}
-                          onChange={e => setLunchStart(e.target.value)}
-                          disabled={isReadOnly}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-white font-mono text-xs cursor-pointer"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block mb-0.5">Duração:</span>
-                        <select
-                          value={lunchDuration}
-                          onChange={e => setLunchDuration(Number(e.target.value))}
-                          disabled={isReadOnly}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-white text-xs cursor-pointer"
-                        >
-                          <option value="30">30 min</option>
-                          <option value="45">45 min</option>
-                          <option value="60">1 hora</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
