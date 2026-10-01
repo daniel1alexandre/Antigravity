@@ -431,6 +431,9 @@ export default function ArenaLiveDisplay({
                       <span className="text-[10px] text-slate-400 group-hover:text-amber-300 font-semibold px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
                         {m.categoryName}
                       </span>
+                      <span className="text-[10px] text-cyan-300 font-bold px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/60 group-hover:bg-cyan-900/80 group-hover:border-cyan-400/50 transition-colors">
+                        {m.roundName}
+                      </span>
                     </div>
 
                     <div className="font-bold text-slate-100 group-hover:text-white truncate mx-2 max-w-[180px] sm:max-w-[240px]">
