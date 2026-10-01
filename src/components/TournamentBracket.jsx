@@ -24,6 +24,9 @@ export default function TournamentBracket({
   bracket, 
   allBrackets,
   category, 
+  categories = [],
+  selectedCategoryId,
+  setSelectedCategoryId,
   courts,
   targetMatchId,
   onOpenScoreModal, 
@@ -437,13 +440,33 @@ export default function TournamentBracket({
               style={{ backgroundColor: category?.color || '#F59E0B' }}
             />
             <h2 className="text-xl sm:text-2xl font-bold font-display text-white">
-              Chave: {category?.name}
+              Chave de Jogos
             </h2>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              Eliminatória Dupla Oficial
+              Eliminatória Dupla
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          
+          {/* Category Selector */}
+          {categories && categories.length > 0 && setSelectedCategoryId && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {categories.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedCategoryId(c.id)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    selectedCategoryId === c.id
+                      ? 'bg-amber-500 text-slate-950 shadow-glow-amber'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <p className="text-xs text-slate-400 mt-2">
             Cada dupla tem direito a uma repescagem. São necessárias 2 derrotas para a eliminação total.
           </p>
         </div>

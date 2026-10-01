@@ -7,6 +7,7 @@ export default function CategoryManager({
   teams, 
   selectedCategoryId, 
   setSelectedCategoryId,
+  onGoToTeams,
   isReadOnly = false
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -169,8 +170,12 @@ export default function CategoryManager({
           return (
             <div
               key={cat.id}
-              className={`relative rounded-2xl p-5 transition-all glass-panel border ${
-                isSelected ? 'border-purple-500 ring-2 ring-purple-500/20 bg-slate-900/90' : 'border-slate-800 hover:border-slate-700'
+              onClick={() => {
+                setSelectedCategoryId(cat.id);
+                if (onGoToTeams) onGoToTeams();
+              }}
+              className={`relative rounded-2xl p-5 transition-all glass-panel border cursor-pointer ${
+                isSelected ? 'border-purple-500 ring-2 ring-purple-500/20 bg-slate-900/90' : 'border-slate-800 hover:border-slate-700 hover:scale-[1.02]'
               }`}
             >
               {/* Color Bar Accent */}

@@ -341,6 +341,26 @@ export default function TeamsManager({
                 {categoryTeams.length} {categoryTeams.length === 1 ? 'dupla cadastrada' : 'duplas cadastradas'}
               </span>
             </div>
+
+            {/* Category Selector */}
+            {categories && categories.length > 0 && setSelectedCategoryId && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {categories.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => setSelectedCategoryId(c.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      selectedCategoryId === c.id
+                        ? 'bg-amber-500 text-slate-950 shadow-glow-amber'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <p className="text-xs sm:text-sm text-slate-400 mt-1">
               Inscrição: <strong className="text-emerald-400">R$ {selectedCategory?.entryFee ?? 0}</strong> • Regra: Set até <strong className="text-amber-300">{selectedCategory?.pointsToWin ?? 18} pts</strong> (+2)
             </p>

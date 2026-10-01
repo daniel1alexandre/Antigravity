@@ -990,13 +990,15 @@ export default function PaymentControl({
                                       : (p1Payment.amount === 0 ? '' : p1Payment.amount)
                                   }
                                   placeholder="0"
-                                  onFocus={() => {
+                                  onFocus={(e) => {
                                     setActiveInputKey(`${team.id}-1`);
-                                    setActiveInputValue('');
+                                    setActiveInputValue(p1Payment.amount === 0 ? '' : p1Payment.amount);
+                                    e.target.select();
                                   }}
-                                  onClick={() => {
+                                  onClick={(e) => {
                                     setActiveInputKey(`${team.id}-1`);
-                                    setActiveInputValue('');
+                                    setActiveInputValue(p1Payment.amount === 0 ? '' : p1Payment.amount);
+                                    e.target.select();
                                   }}
                                   onBlur={() => {
                                     if (activeInputKey === `${team.id}-1` && activeInputValue === '') {
@@ -1135,13 +1137,15 @@ export default function PaymentControl({
                                       : (p2Payment.amount === 0 ? '' : p2Payment.amount)
                                   }
                                   placeholder="0"
-                                  onFocus={() => {
+                                  onFocus={(e) => {
                                     setActiveInputKey(`${team.id}-2`);
-                                    setActiveInputValue('');
+                                    setActiveInputValue(p2Payment.amount === 0 ? '' : p2Payment.amount);
+                                    e.target.select();
                                   }}
-                                  onClick={() => {
+                                  onClick={(e) => {
                                     setActiveInputKey(`${team.id}-2`);
-                                    setActiveInputValue('');
+                                    setActiveInputValue(p2Payment.amount === 0 ? '' : p2Payment.amount);
+                                    e.target.select();
                                   }}
                                   onBlur={() => {
                                     if (activeInputKey === `${team.id}-2` && activeInputValue === '') {

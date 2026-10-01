@@ -487,6 +487,9 @@ export default function App() {
             bracket={currentBracket}
             allBrackets={brackets}
             category={currentCategory}
+            categories={categories}
+            selectedCategoryId={selectedCategoryId}
+            setSelectedCategoryId={setSelectedCategoryId}
             courts={eventInfo?.courts}
             targetMatchId={targetMatchId}
             onOpenScoreModal={(match) => setScoreModalMatch(match)}
@@ -529,6 +532,7 @@ export default function App() {
             teams={teams}
             selectedCategoryId={selectedCategoryId}
             setSelectedCategoryId={setSelectedCategoryId}
+            onGoToTeams={() => setActiveTab('teams')}
             isReadOnly={isReadOnly}
           />
         )}

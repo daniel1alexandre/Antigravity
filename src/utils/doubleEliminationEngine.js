@@ -290,40 +290,45 @@ export function generateDoubleEliminationBracket(teams, category) {
  */
 export function autoResolveByes(state) {
   const updatedMatches = { ...state.matches };
-  const wr1MatchIds = state.winnersRounds[0]?.matchIds || [];
+  let resolvedAny = false;
 
-  wr1MatchIds.forEach((mId) => {
-    const match = updatedMatches[mId];
-    if (!match) return;
+  do {
+    resolvedAny = false;
+    for (const mId in updatedMatches) {
+      const match = updatedMatches[mId];
+      if (match.status === 'COMPLETED') continue;
 
-    const t1IsBye = match.team1?.isBye;
-    const t2IsBye = match.team2?.isBye;
+      const t1IsBye = match.team1?.isBye;
+      const t2IsBye = match.team2?.isBye;
 
-    if (t1IsBye && t2IsBye) {
-      // Both BYEs
-      match.status = 'COMPLETED';
-      match.winnerId = match.team1.id;
-      match.loserId = match.team2.id;
-      match.isBye = true;
-      propagateResult(updatedMatches, match, match.team1, match.team2);
-    } else if (t1IsBye && match.team2) {
-      // Team 2 gets BYE win
-      match.status = 'COMPLETED';
-      match.winnerId = match.team2.id;
-      match.loserId = match.team1.id;
-      match.isBye = true;
-      propagateResult(updatedMatches, match, match.team2, match.team1);
-    } else if (t2IsBye && match.team1) {
-      // Team 1 gets BYE win
-      match.status = 'COMPLETED';
-      match.winnerId = match.team1.id;
-      match.loserId = match.team2.id;
-      match.isBye = true;
-      propagateResult(updatedMatches, match, match.team1, match.team2);
-    } else if (match.team1 && match.team2) {
-      match.status = 'READY';
+      if (t1IsBye || t2IsBye) {
+        if (t1IsBye && t2IsBye) {
+          match.status = 'COMPLETED';
+          match.winnerId = match.team1.id;
+          match.loserId = match.team2.id;
+          match.isBye = true;
+          propagateResult(updatedMatches, match, match.team1, match.team2);
+          resolvedAny = true;
+        } else if (t1IsBye && match.team2) {
+          match.status = 'COMPLETED';
+          match.winnerId = match.team2.id;
+          match.loserId = match.team1.id;
+          match.isBye = true;
+          propagateResult(updatedMatches, match, match.team2, match.team1);
+          resolvedAny = true;
+        } else if (t2IsBye && match.team1) {
+          match.status = 'COMPLETED';
+          match.winnerId = match.team1.id;
+          match.loserId = match.team2.id;
+          match.isBye = true;
+          propagateResult(updatedMatches, match, match.team1, match.team2);
+          resolvedAny = true;
+        }
+      } else if (match.team1 && match.team2 && match.status === 'PENDING') {
+        match.status = 'READY';
+      }
     }
-  });
+  } while (resolvedAny);
 
   return { ...state, matches: updatedMatches };
 }
@@ -333,7 +338,7 @@ export function autoResolveByes(state) {
  */
 function propagateResult(matches, match, winningTeam, losingTeam) {
   // Push Winner
-  if (match.nextWinnerMatchId && winningTeam && !winningTeam.isBye) {
+  if (match.nextWinnerMatchId && winningTeam) {
     const nextW = matches[match.nextWinnerMatchId];
     if (nextW) {
       if (match.nextWinnerSlot === 'team1') nextW.team1 = winningTeam;
@@ -346,7 +351,7 @@ function propagateResult(matches, match, winningTeam, losingTeam) {
   }
 
   // Push Loser (to Losers Bracket)
-  if (match.nextLoserMatchId && losingTeam && !losingTeam.isBye) {
+  if (match.nextLoserMatchId && losingTeam) {
     const nextL = matches[match.nextLoserMatchId];
     if (nextL) {
       if (match.nextLoserSlot === 'team1') nextL.team1 = losingTeam;
@@ -390,15 +395,20 @@ export function updateMatchScore(state, matchId, score1, score2, sets = []) {
   // Propagate results
   propagateResult(matches, match, winningTeam, losingTeam);
 
+  let newState = { ...state, matches };
+
+  // Auto-resolve any new BYE encounters that were formed by the propagation
+  newState = autoResolveByes(newState);
+
   // Compute final standings if Grand Final completed
-  let standings = [...(state.standings || [])];
-  if (match.bracket === 'GRAND_FINAL' && match.status === 'COMPLETED') {
-    standings = calculateStandings({ ...state, matches });
+  let standings = [...(newState.standings || [])];
+  const gfMatch = newState.matches['GF-M1'];
+  if (gfMatch && gfMatch.status === 'COMPLETED') {
+    standings = calculateStandings(newState);
   }
 
   return {
-    ...state,
-    matches,
+    ...newState,
     standings,
   };
 }
