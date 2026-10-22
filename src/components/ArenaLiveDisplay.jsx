@@ -112,15 +112,38 @@ export default function ArenaLiveDisplay({
     return !allLiveBracketMatches.some(m => m.court === cName && m.status !== 'COMPLETED');
   });
 
+  // Collect all matches from scheduleData, plus any bracket matches that were not yet in scheduleData
+  const scheduledMatchIds = new Set((scheduleData.scheduledMatches || []).map(sm => sm.realMatchId || sm.id));
+  const missingBracketMatches = allLiveBracketMatches
+    .filter(m => !scheduledMatchIds.has(m.id))
+    .map((m, idx) => ({
+      ...m,
+      realMatchId: m.id,
+      dayId: days[0]?.id || 'day-1',
+      dayName: days[0]?.name || 'Dia 1',
+      timeFormatted: days[0]?.startTime || '08:00',
+      slotStartMins: 480 + (idx * 5),
+    }));
+
+  const baseScheduledList = [
+    ...(scheduleData.scheduledMatches || []),
+    ...missingBracketMatches,
+  ];
+
   // Build the day-aware scheduled match list
   // Merging schedule order, scheduled times, rounds, and live bracket states
-  const scheduledList = (scheduleData.scheduledMatches || []).map(sm => {
+  const scheduledList = baseScheduledList.map(sm => {
     const liveMatch = brackets[sm.categoryId]?.matches?.[sm.realMatchId || sm.id];
     const categoryObj = categories.find(c => c.id === sm.categoryId) || sm.category;
     
     const team1 = liveMatch?.team1 || sm.team1 || null;
     const team2 = liveMatch?.team2 || sm.team2 || null;
-    const court = liveMatch?.court || sm.courtName || sm.court?.name || null;
+    
+    // activeCourt is the actual court currently in live play from brackets!
+    // sm.courtName is only the simulated/scheduled court from the official schedule.
+    const activeCourt = liveMatch?.court || null;
+    const scheduledCourt = sm.courtName || sm.court?.name || null;
+    
     const status = liveMatch?.status || sm.status || 'PENDING';
     const score1 = (liveMatch && liveMatch.score1 !== null && liveMatch.score1 !== undefined) ? liveMatch.score1 : null;
     const score2 = (liveMatch && liveMatch.score2 !== null && liveMatch.score2 !== undefined) ? liveMatch.score2 : null;
@@ -130,10 +153,19 @@ export default function ArenaLiveDisplay({
     const t2IsBye = Boolean(team2?.isBye || team2?.id?.startsWith('BYE'));
     const isBye = Boolean(sm.isBye || liveMatch?.isBye || t1IsBye || t2IsBye);
 
-    const hasBothTeams = Boolean(team1 && team2 && !t1IsBye && !t2IsBye && team1.id && team2.id);
+    const hasBothTeams = Boolean(
+      team1 && team2 &&
+      !t1IsBye && !t2IsBye &&
+      (team1.displayName || team1.name || team1.id) &&
+      (team2.displayName || team2.name || team2.id) &&
+      !team1.id?.toString().startsWith('W_') &&
+      !team1.id?.toString().startsWith('L_') &&
+      !team2.id?.toString().startsWith('W_') &&
+      !team2.id?.toString().startsWith('L_')
+    );
     const isCompleted = status === 'COMPLETED';
-    const isLive = (status === 'LIVE' || (court && status === 'READY')) && !isCompleted;
-    const isReady = hasBothTeams && !court && !isCompleted && !isBye;
+    const isLive = Boolean(activeCourt && (status === 'LIVE' || status === 'WARMUP' || status === 'READY')) && !isCompleted;
+    const isReady = hasBothTeams && !activeCourt && !isCompleted && !isBye;
     const isWaitingPrevious = !hasBothTeams && !isCompleted && !isBye;
 
     const bType = liveMatch?.bracket || liveMatch?.type || sm.bracket || sm.type || 'WINNERS';
@@ -156,7 +188,9 @@ export default function ArenaLiveDisplay({
       team2,
       team1Name: team1?.displayName || (t1IsBye ? 'Folga' : 'A definir'),
       team2Name: team2?.displayName || (t2IsBye ? 'Folga' : 'A definir'),
-      court,
+      court: activeCourt,
+      activeCourt,
+      scheduledCourt,
       status,
       score1,
       score2,
@@ -204,6 +238,7 @@ export default function ArenaLiveDisplay({
   // Drop handler for free court
   const handleDropOnCourt = (e, courtName) => {
     e.preventDefault();
+    e.stopPropagation();
     setDragOverCourt(null);
     if (isReadOnly) return;
 
@@ -211,7 +246,7 @@ export default function ArenaLiveDisplay({
     let categoryId = null;
 
     try {
-      const raw = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
+      const raw = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text');
       if (raw) {
         const parsed = JSON.parse(raw);
         matchId = parsed.matchId;
@@ -431,17 +466,24 @@ export default function ArenaLiveDisplay({
               <div
                 key={court.id || courtName}
                 onDragOver={(e) => {
+                  e.preventDefault();
                   if (!isAvailable) {
                     e.dataTransfer.dropEffect = 'none';
                     return;
                   }
-                  e.preventDefault();
                   e.dataTransfer.dropEffect = 'move';
                   if (dragOverCourt !== courtName) {
                     setDragOverCourt(courtName);
                   }
                 }}
-                onDragLeave={() => {
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  if (isAvailable && dragOverCourt !== courtName) {
+                    setDragOverCourt(courtName);
+                  }
+                }}
+                onDragLeave={(e) => {
+                  if (e.currentTarget.contains(e.relatedTarget)) return;
                   if (dragOverCourt === courtName) {
                     setDragOverCourt(null);
                   }
