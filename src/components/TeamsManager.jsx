@@ -23,7 +23,7 @@ import {
   AlertCircle,
   ArrowUpRight
 } from 'lucide-react';
-import { PAYMENT_STATUS, SHIRT_SIZES, getAthletePayment } from '../types/tournament';
+import { PAYMENT_STATUS, SHIRT_SIZES, getAthletePayment, getAthleteOtherCategories } from '../types/tournament';
 
 export default function TeamsManager({ 
   teams, 
@@ -43,6 +43,8 @@ export default function TeamsManager({
   const [editingTeam, setEditingTeam] = useState(null);
   const [sharePreviewTeam, setSharePreviewTeam] = useState(null);
 
+  const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0] || null;
+
   // Form State
   const [formData, setFormData] = useState({
     categoryId: selectedCategoryId,
@@ -51,11 +53,13 @@ export default function TeamsManager({
     player1Phone: '',
     player1Instagram: '',
     player1ShirtSize: 'M',
+    player1Fee: '',
     player2Name: '',
     player2Nickname: '',
     player2Phone: '',
     player2Instagram: '',
     player2ShirtSize: 'M',
+    player2Fee: '',
     city: '',
     isSeed: false,
     seedRank: '',
@@ -65,8 +69,6 @@ export default function TeamsManager({
     paymentNotes: '',
   });
 
-  const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0] || null;
-
   // Open modal for Create
   const handleOpenCreate = () => {
     if (categories.length === 0) {
@@ -74,6 +76,9 @@ export default function TeamsManager({
       if (onGoToCategories) onGoToCategories();
       return;
     }
+    const cat = categories.find(c => c.id === (selectedCategoryId || categories[0]?.id)) || selectedCategory;
+    const catFee = cat ? cat.entryFee : 70;
+
     setEditingTeam(null);
     setFormData({
       categoryId: selectedCategoryId || categories[0]?.id || '',
@@ -82,11 +87,13 @@ export default function TeamsManager({
       player1Phone: '',
       player1Instagram: '',
       player1ShirtSize: 'M',
+      player1Fee: catFee,
       player2Name: '',
       player2Nickname: '',
       player2Phone: '',
       player2Instagram: '',
       player2ShirtSize: 'M',
+      player2Fee: catFee,
       city: '',
       isSeed: false,
       seedRank: '',
@@ -101,6 +108,11 @@ export default function TeamsManager({
   // Open modal for Edit
   const handleOpenEdit = (team) => {
     setEditingTeam(team);
+    const cat = categories.find(c => c.id === team.categoryId) || selectedCategory;
+    const entryFee = cat ? cat.entryFee : 70;
+    const p1Pay = getAthletePayment(team, 1, entryFee);
+    const p2Pay = getAthletePayment(team, 2, entryFee);
+
     setFormData({
       categoryId: team.categoryId,
       player1Name: team.player1?.name || '',
@@ -108,17 +120,19 @@ export default function TeamsManager({
       player1Phone: team.player1?.phone || '',
       player1Instagram: team.player1?.instagram || '',
       player1ShirtSize: team.player1?.shirtSize || 'M',
+      player1Fee: p1Pay.fee,
       player2Name: team.player2?.name || '',
       player2Nickname: team.player2?.nickname || '',
       player2Phone: team.player2?.phone || '',
       player2Instagram: team.player2?.instagram || '',
       player2ShirtSize: team.player2?.shirtSize || 'M',
+      player2Fee: p2Pay.fee,
       city: team.city || '',
       isSeed: Boolean(team.isSeed),
       seedRank: team.seedRank || '',
       paymentStatus: team.paymentStatus || 'PENDING',
       paymentMethod: team.paymentMethod || 'PIX',
-      paidAmount: team.paidAmount ?? (team.paymentStatus === 'PAID_FULL' ? selectedCategory.entryFee : 0),
+      paidAmount: team.paidAmount ?? (team.paymentStatus === 'PAID_FULL' ? (p1Pay.fee + p2Pay.fee) : 0),
       paymentNotes: team.paymentNotes || '',
     });
     setIsAddModalOpen(true);
@@ -131,6 +145,11 @@ export default function TeamsManager({
       alert('Preencha o nome de ambos os atletas da dupla.');
       return;
     }
+
+    const cat = categories.find(c => c.id === formData.categoryId) || selectedCategory;
+    const p1Fee = Number(formData.player1Fee || cat?.entryFee || 70);
+    const p2Fee = Number(formData.player2Fee || cat?.entryFee || 70);
+    const duplaTotalFee = p1Fee + p2Fee;
 
     const displayName = `${formData.player1Nickname || formData.player1Name.split(' ')[0]} & ${formData.player2Nickname || formData.player2Name.split(' ')[0]}`;
 
@@ -146,7 +165,7 @@ export default function TeamsManager({
             seedRank: formData.isSeed && formData.seedRank ? Number(formData.seedRank) : null,
             paymentStatus: formData.paymentStatus,
             paymentMethod: formData.paymentMethod,
-            paidAmount: formData.paymentStatus === 'EXEMPT' ? 0 : Number(formData.paidAmount || 0),
+            paidAmount: formData.paymentStatus === 'EXEMPT' ? 0 : Number(formData.paidAmount || (formData.paymentStatus === 'PAID_FULL' ? duplaTotalFee : 0)),
             paymentNotes: formData.paymentNotes,
             player1: {
               name: formData.player1Name,
@@ -154,7 +173,9 @@ export default function TeamsManager({
               phone: formData.player1Phone,
               instagram: formData.player1Instagram,
               shirtSize: formData.player1ShirtSize,
-              payment: formData.paymentStatus === 'EXEMPT' ? { status: 'EXEMPT', amount: 0 } : (t.player1?.payment || null),
+              payment: formData.paymentStatus === 'EXEMPT' 
+                ? { status: 'EXEMPT', amount: 0, fee: 0 } 
+                : { ...(t.player1?.payment || {}), fee: p1Fee, amount: formData.paymentStatus === 'PAID_FULL' ? p1Fee : (t.player1?.payment?.amount || 0), status: formData.paymentStatus },
             },
             player2: {
               name: formData.player2Name,
@@ -162,16 +183,17 @@ export default function TeamsManager({
               phone: formData.player2Phone,
               instagram: formData.player2Instagram,
               shirtSize: formData.player2ShirtSize,
-              payment: formData.paymentStatus === 'EXEMPT' ? { status: 'EXEMPT', amount: 0 } : (t.player2?.payment || null),
+              payment: formData.paymentStatus === 'EXEMPT' 
+                ? { status: 'EXEMPT', amount: 0, fee: 0 } 
+                : { ...(t.player2?.payment || {}), fee: p2Fee, amount: formData.paymentStatus === 'PAID_FULL' ? p2Fee : (t.player2?.payment?.amount || 0), status: formData.paymentStatus },
             },
           };
         }
         return t;
       }));
     } else {
-      const cat = categories.find(c => c.id === formData.categoryId) || selectedCategory;
       const isExempt = formData.paymentStatus === 'EXEMPT';
-      const initialPaid = isExempt ? 0 : (formData.paymentStatus === 'PAID_FULL' ? (Number(formData.paidAmount) || (cat ? cat.entryFee : 140)) : Number(formData.paidAmount || 0));
+      const initialPaid = isExempt ? 0 : (formData.paymentStatus === 'PAID_FULL' ? (Number(formData.paidAmount) || duplaTotalFee) : Number(formData.paidAmount || 0));
 
       const newTeam = {
         id: `team-${Date.now()}`,
@@ -191,6 +213,12 @@ export default function TeamsManager({
           phone: formData.player1Phone,
           instagram: formData.player1Instagram,
           shirtSize: formData.player1ShirtSize,
+          payment: {
+            status: isExempt ? 'EXEMPT' : (formData.paymentStatus === 'PAID_FULL' ? 'PAID_FULL' : 'PENDING'),
+            amount: isExempt ? 0 : (formData.paymentStatus === 'PAID_FULL' ? p1Fee : 0),
+            fee: isExempt ? 0 : p1Fee,
+            method: formData.paymentMethod || 'PIX',
+          }
         },
         player2: {
           name: formData.player2Name,
@@ -198,6 +226,12 @@ export default function TeamsManager({
           phone: formData.player2Phone,
           instagram: formData.player2Instagram,
           shirtSize: formData.player2ShirtSize,
+          payment: {
+            status: isExempt ? 'EXEMPT' : (formData.paymentStatus === 'PAID_FULL' ? 'PAID_FULL' : 'PENDING'),
+            amount: isExempt ? 0 : (formData.paymentStatus === 'PAID_FULL' ? p2Fee : 0),
+            fee: isExempt ? 0 : p2Fee,
+            method: formData.paymentMethod || 'PIX',
+          }
         },
       };
       setTeams([newTeam, ...teams]);
@@ -217,19 +251,40 @@ export default function TeamsManager({
   const handleQuickPaymentToggle = (team) => {
     const nextStatus = team.paymentStatus === 'PAID_FULL' ? 'PENDING' : 'PAID_FULL';
     const cat = categories.find(c => c.id === team.categoryId) || selectedCategory;
-    const nextAmount = nextStatus === 'PAID_FULL' ? cat.entryFee : 0;
+    const entryFee = cat ? cat.entryFee : 70;
+    const p1Pay = getAthletePayment(team, 1, entryFee);
+    const p2Pay = getAthletePayment(team, 2, entryFee);
+    const nextAmount = nextStatus === 'PAID_FULL' ? (p1Pay.fee + p2Pay.fee) : 0;
 
     setTeams(teams.map(t => t.id === team.id ? {
       ...t,
       paymentStatus: nextStatus,
       paidAmount: nextAmount,
       paymentDate: nextStatus === 'PAID_FULL' ? new Date().toISOString().slice(0, 10) : null,
+      player1: {
+        ...t.player1,
+        payment: {
+          ...t.player1?.payment,
+          status: nextStatus,
+          amount: nextStatus === 'PAID_FULL' ? p1Pay.fee : 0,
+          date: nextStatus === 'PAID_FULL' ? new Date().toISOString().slice(0, 10) : null,
+        }
+      },
+      player2: {
+        ...t.player2,
+        payment: {
+          ...t.player2?.payment,
+          status: nextStatus,
+          amount: nextStatus === 'PAID_FULL' ? p2Pay.fee : 0,
+          date: nextStatus === 'PAID_FULL' ? new Date().toISOString().slice(0, 10) : null,
+        }
+      }
     } : t));
   };
 
   // Filtered Teams & Individual Athlete Metrics
   const categoryTeams = teams.filter(t => t.categoryId === selectedCategoryId);
-  const selectedCatFee = selectedCategory?.entryFee || 140;
+  const selectedCatFee = selectedCategory?.entryFee || 70;
 
   let totalAthletesCount = 0;
   let paidAthletesCount = 0;
@@ -362,7 +417,7 @@ export default function TeamsManager({
             )}
 
             <p className="text-xs sm:text-sm text-slate-400 mt-1">
-              Inscrição: <strong className="text-emerald-400">R$ {selectedCategory?.entryFee ?? 0}</strong> • Regra: Set até <strong className="text-amber-300">{selectedCategory?.pointsToWin ?? 18} pts</strong> (+2)
+              Inscrição: <strong className="text-emerald-400">R$ {selectedCategory?.entryFee ?? 0} / atleta</strong> (R$ {(selectedCategory?.entryFee ?? 0) * 2} por dupla){selectedCategory?.secondCategoryFee ? <span className="text-amber-400 font-semibold ml-1.5">• 2ª Cat: R$ {selectedCategory.secondCategoryFee}</span> : null} • Regra: Set até <strong className="text-amber-300">{selectedCategory?.pointsToWin ?? 18} pts</strong> (+2)
             </p>
           </div>
 
@@ -539,9 +594,12 @@ export default function TeamsManager({
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
           {filteredTeams.map((team, index) => {
             const cat = categories.find(c => c.id === team.categoryId) || selectedCategory;
-            const entryFee = cat ? cat.entryFee : 140;
+            const entryFee = cat ? cat.entryFee : 70;
             const p1Pay = getAthletePayment(team, 1, entryFee);
             const p2Pay = getAthletePayment(team, 2, entryFee);
+            const p1OtherCats = getAthleteOtherCategories(team.player1, teams, categories, team.id);
+            const p2OtherCats = getAthleteOtherCategories(team.player2, teams, categories, team.id);
+            const teamTotalFee = (p1Pay.fee || 0) + (p2Pay.fee || 0);
 
             // Determine individual athlete payments
             const isP1Paid = p1Pay.status === 'PAID_FULL' || p1Pay.status === 'EXEMPT' || Number(p1Pay.amount) > 0;
@@ -656,34 +714,46 @@ export default function TeamsManager({
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
                             <span className={`w-5 h-5 rounded border font-bold text-[10px] flex items-center justify-center flex-shrink-0 ${cardColorConfig.athleteP1Index}`}>
                               1
                             </span>
-                            <p className="text-xs font-bold text-white transition-colors truncate">
-                              {team.player1?.name}
-                              {team.player1?.nickname && (
-                                <span className="text-amber-300 ml-1 font-normal">"{team.player1?.nickname}"</span>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold text-white transition-colors truncate">
+                                {team.player1?.name}
+                                {team.player1?.nickname && (
+                                  <span className="text-amber-300 ml-1 font-normal">"{team.player1?.nickname}"</span>
+                                )}
+                              </p>
+                              {p1OtherCats.length > 0 && (
+                                <span className="inline-block text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-purple-500/25 text-purple-300 border border-purple-500/35" title={`2ª Categoria (Também em ${p1OtherCats.map(c => c.categoryName).join(', ')})`}>
+                                  2ª Categoria
+                                </span>
                               )}
-                            </p>
+                            </div>
                           </div>
 
                           {/* Athlete 1 Payment Indicator Badge */}
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border flex-shrink-0 whitespace-nowrap ${
-                            p1Pay.status === 'PAID_FULL' 
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                              : p1Pay.status === 'EXEMPT'
-                              ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                              : 'bg-rose-500/20 text-rose-300 border-rose-500/35'
-                          }`}>
-                            {p1Pay.status === 'PAID_FULL' ? (
-                              <><CheckCircle2 className="w-3 h-3 text-emerald-400" /> Pago (R$ {p1Pay.amount})</>
-                            ) : p1Pay.status === 'EXEMPT' ? (
-                              <><ShieldCheck className="w-3 h-3 text-purple-400" /> Isento</>
-                            ) : (
-                              <><AlertCircle className="w-3 h-3 text-rose-400" /> Pendente</>
-                            )}
-                          </span>
+                          <div className="text-right flex flex-col items-end flex-shrink-0">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border whitespace-nowrap ${
+                              p1Pay.status === 'PAID_FULL' 
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                : p1Pay.status === 'EXEMPT'
+                                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                                : 'bg-rose-500/20 text-rose-300 border-rose-500/35'
+                            }`}>
+                              {p1Pay.status === 'PAID_FULL' ? (
+                                <><CheckCircle2 className="w-3 h-3 text-emerald-400" /> Pago (R$ {p1Pay.amount})</>
+                              ) : p1Pay.status === 'EXEMPT' ? (
+                                <><ShieldCheck className="w-3 h-3 text-purple-400" /> Isento</>
+                              ) : (
+                                <><AlertCircle className="w-3 h-3 text-rose-400" /> Pendente</>
+                              )}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                              Cota: R$ {p1Pay.fee}
+                            </span>
+                          </div>
                         </div>
 
                         <div className="flex items-center gap-2 mt-1 text-[10px] text-white/70">
@@ -726,36 +796,48 @@ export default function TeamsManager({
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
                             <span className={`w-5 h-5 rounded border font-bold text-[10px] flex items-center justify-center flex-shrink-0 ${cardColorConfig.athleteP2Index}`}>
                               2
                             </span>
-                            <p className="text-xs font-bold text-white transition-colors truncate">
-                              {team.player2?.name}
-                              {team.player2?.nickname && (
-                                <span className="text-amber-300 ml-1 font-normal">"{team.player2?.nickname}"</span>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold text-white transition-colors truncate">
+                                {team.player2?.name}
+                                {team.player2?.nickname && (
+                                  <span className="text-amber-300 ml-1 font-normal">"{team.player2?.nickname}"</span>
+                                )}
+                              </p>
+                              {p2OtherCats.length > 0 && (
+                                <span className="inline-block text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-purple-500/25 text-purple-300 border border-purple-500/35" title={`2ª Categoria (Também em ${p2OtherCats.map(c => c.categoryName).join(', ')})`}>
+                                  2ª Categoria
+                                </span>
                               )}
-                            </p>
+                            </div>
                           </div>
 
                           {/* Athlete 2 Payment Indicator Badge */}
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border flex-shrink-0 whitespace-nowrap ${
-                            p2Pay.status === 'PAID_FULL' 
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                              : p2Pay.status === 'EXEMPT'
-                              ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                              : 'bg-rose-500/20 text-rose-300 border-rose-500/35'
-                          }`}>
-                            {p2Pay.status === 'PAID_FULL' ? (
-                              <><CheckCircle2 className="w-3 h-3 text-emerald-400" /> Pago (R$ {p2Pay.amount})</>
-                            ) : p2Pay.status === 'PAID_HALF' ? (
-                              <><Clock className="w-3 h-3 text-cyan-400" /> 50% (R$ {p2Pay.amount})</>
-                            ) : p2Pay.status === 'EXEMPT' ? (
-                              <><ShieldCheck className="w-3 h-3 text-purple-400" /> Isento</>
-                            ) : (
-                              <><AlertCircle className="w-3 h-3 text-rose-400" /> Pendente</>
-                            )}
-                          </span>
+                          <div className="text-right flex flex-col items-end flex-shrink-0">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border whitespace-nowrap ${
+                              p2Pay.status === 'PAID_FULL' 
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                : p2Pay.status === 'EXEMPT'
+                                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                                : 'bg-rose-500/20 text-rose-300 border-rose-500/35'
+                            }`}>
+                              {p2Pay.status === 'PAID_FULL' ? (
+                                <><CheckCircle2 className="w-3 h-3 text-emerald-400" /> Pago (R$ {p2Pay.amount})</>
+                              ) : p2Pay.status === 'PAID_HALF' ? (
+                                <><Clock className="w-3 h-3 text-cyan-400" /> 50% (R$ {p2Pay.amount})</>
+                              ) : p2Pay.status === 'EXEMPT' ? (
+                                <><ShieldCheck className="w-3 h-3 text-purple-400" /> Isento</>
+                              ) : (
+                                <><AlertCircle className="w-3 h-3 text-rose-400" /> Pendente</>
+                              )}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                              Cota: R$ {p2Pay.fee}
+                            </span>
+                          </div>
                         </div>
 
                         <div className="flex items-center gap-2 mt-1 text-[10px] text-white/70">
@@ -850,148 +932,270 @@ export default function TeamsManager({
               </button>
             </div>
 
-            <form onSubmit={handleSaveTeam} className="space-y-4">
-              {/* Category selection */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Categoria *</label>
-                <select
-                  value={formData.categoryId}
-                  onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-amber-500 focus:outline-none"
-                >
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} (R$ {c.entryFee})
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {(() => {
+              const modalCat = categories.find(c => c.id === formData.categoryId) || selectedCategory;
+              const p1DetectedOther = getAthleteOtherCategories({ name: formData.player1Name, phone: formData.player1Phone }, teams, categories, editingTeam?.id, formData.categoryId);
+              const p2DetectedOther = getAthleteOtherCategories({ name: formData.player2Name, phone: formData.player2Phone }, teams, categories, editingTeam?.id, formData.categoryId);
 
-              {/* Atleta 1 */}
-              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
-                  Atleta 1 (Jogador 1)
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              return (
+                <form onSubmit={handleSaveTeam} className="space-y-4">
+                  {/* Category selection */}
                   <div>
-                    <label className="block text-[11px] text-slate-400 mb-0.5">Nome Completo *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ex: Lucas Gabriel da Silva"
-                      value={formData.player1Name}
-                      onChange={(e) => setFormData({ ...formData, player1Name: e.target.value })}
-                      className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-0.5">Apelido no Futvôlei</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Canhotinha"
-                      value={formData.player1Nickname}
-                      onChange={(e) => setFormData({ ...formData, player1Nickname: e.target.value })}
-                      className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="col-span-1 sm:col-span-1">
-                    <label className="block text-[11px] text-slate-400 mb-0.5">WhatsApp / Fone</label>
-                    <input
-                      type="text"
-                      placeholder="(11) 98765-4321"
-                      value={formData.player1Phone}
-                      onChange={(e) => setFormData({ ...formData, player1Phone: e.target.value })}
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div className="col-span-1 sm:col-span-1">
-                    <label className="block text-[11px] text-slate-400 mb-0.5">Instagram</label>
-                    <input
-                      type="text"
-                      placeholder="@atleta"
-                      value={formData.player1Instagram}
-                      onChange={(e) => setFormData({ ...formData, player1Instagram: e.target.value })}
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-0.5">Camisa</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Categoria *</label>
                     <select
-                      value={formData.player1ShirtSize}
-                      onChange={(e) => setFormData({ ...formData, player1ShirtSize: e.target.value })}
-                      className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
+                      value={formData.categoryId}
+                      onChange={(e) => {
+                        const newCatId = e.target.value;
+                        const newCat = categories.find(c => c.id === newCatId);
+                        const newFee = newCat ? newCat.entryFee : 70;
+                        setFormData({ 
+                          ...formData, 
+                          categoryId: newCatId,
+                          player1Fee: newFee,
+                          player2Fee: newFee,
+                        });
+                      }}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-amber-500 focus:outline-none"
                     >
-                      {SHIRT_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} (R$ {c.entryFee}/atleta • Dupla R$ {c.entryFee * 2})
+                        </option>
+                      ))}
                     </select>
                   </div>
-                </div>
-              </div>
 
-              {/* Atleta 2 */}
-              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
-                  Atleta 2 (Jogador 2)
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-0.5">Nome Completo *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ex: Gabriel Santos Ribeiro"
-                      value={formData.player2Name}
-                      onChange={(e) => setFormData({ ...formData, player2Name: e.target.value })}
-                      className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-0.5">Apelido no Futvôlei</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Biel"
-                      value={formData.player2Nickname}
-                      onChange={(e) => setFormData({ ...formData, player2Nickname: e.target.value })}
-                      className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                </div>
+                  {/* Atleta 1 */}
+                  <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
+                        Atleta 1 (Jogador 1)
+                      </span>
+                      {p1DetectedOther.length > 0 && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                          2ª Categoria Detectada
+                        </span>
+                      )}
+                    </div>
 
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-0.5">WhatsApp / Fone</label>
-                    <input
-                      type="text"
-                      placeholder="(11) 98765-4322"
-                      value={formData.player2Phone}
-                      onChange={(e) => setFormData({ ...formData, player2Phone: e.target.value })}
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
-                    />
+                    {p1DetectedOther.length > 0 && (
+                      <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-xs text-purple-200 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Sparkles className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                          <span className="truncate">Inscrito também em: <strong className="text-white">{p1DetectedOther.map(c => c.categoryName).join(', ')}</strong></span>
+                        </div>
+                        {modalCat?.secondCategoryFee && (
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, player1Fee: modalCat.secondCategoryFee })}
+                            className="px-2 py-0.5 rounded bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-400/40 text-[10px] font-bold whitespace-nowrap cursor-pointer transition-colors flex-shrink-0"
+                          >
+                            Aplicar 2ª Cat: R$ {modalCat.secondCategoryFee}
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-0.5">Nome Completo *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: Lucas Gabriel da Silva"
+                          value={formData.player1Name}
+                          onChange={(e) => setFormData({ ...formData, player1Name: e.target.value })}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-0.5">Apelido no Futvôlei</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Canhotinha"
+                          value={formData.player1Nickname}
+                          onChange={(e) => setFormData({ ...formData, player1Nickname: e.target.value })}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="col-span-1 sm:col-span-1">
+                        <label className="block text-[11px] text-slate-400 mb-0.5">WhatsApp / Fone</label>
+                        <input
+                          type="text"
+                          placeholder="(11) 98765-4321"
+                          value={formData.player1Phone}
+                          onChange={(e) => setFormData({ ...formData, player1Phone: e.target.value })}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div className="col-span-1 sm:col-span-1">
+                        <label className="block text-[11px] text-slate-400 mb-0.5">Instagram</label>
+                        <input
+                          type="text"
+                          placeholder="@atleta"
+                          value={formData.player1Instagram}
+                          onChange={(e) => setFormData({ ...formData, player1Instagram: e.target.value })}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-0.5">Camisa</label>
+                        <select
+                          value={formData.player1ShirtSize}
+                          onChange={(e) => setFormData({ ...formData, player1ShirtSize: e.target.value })}
+                          className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
+                        >
+                          {SHIRT_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Athlete 1 Custom Fee */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-slate-800/80">
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-0.5 flex items-center justify-between">
+                          <span>Taxa de Inscrição Atleta 1 (R$)</span>
+                          <span className="text-[10px] text-emerald-400 font-semibold">Cota individual</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">R$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="5"
+                            placeholder={String(modalCat?.entryFee || 70)}
+                            value={formData.player1Fee ?? ''}
+                            onChange={(e) => setFormData({ ...formData, player1Fee: e.target.value })}
+                            className="w-full pl-8 pr-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-emerald-400 font-bold focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-end pb-1 text-[10px] text-slate-500">
+                        {p1DetectedOther.length > 0 
+                          ? '💡 2ª Categoria: valor especial para o atleta.' 
+                          : `Padrão da categoria: R$ ${modalCat?.entryFee || 70}.`}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-0.5">Instagram</label>
-                    <input
-                      type="text"
-                      placeholder="@atleta2"
-                      value={formData.player2Instagram}
-                      onChange={(e) => setFormData({ ...formData, player2Instagram: e.target.value })}
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
-                    />
+
+                  {/* Atleta 2 */}
+                  <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
+                        Atleta 2 (Jogador 2)
+                      </span>
+                      {p2DetectedOther.length > 0 && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                          2ª Categoria Detectada
+                        </span>
+                      )}
+                    </div>
+
+                    {p2DetectedOther.length > 0 && (
+                      <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-xs text-purple-200 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Sparkles className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                          <span className="truncate">Inscrito também em: <strong className="text-white">{p2DetectedOther.map(c => c.categoryName).join(', ')}</strong></span>
+                        </div>
+                        {modalCat?.secondCategoryFee && (
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, player2Fee: modalCat.secondCategoryFee })}
+                            className="px-2 py-0.5 rounded bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-400/40 text-[10px] font-bold whitespace-nowrap cursor-pointer transition-colors flex-shrink-0"
+                          >
+                            Aplicar 2ª Cat: R$ {modalCat.secondCategoryFee}
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-0.5">Nome Completo *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: Gabriel Santos Ribeiro"
+                          value={formData.player2Name}
+                          onChange={(e) => setFormData({ ...formData, player2Name: e.target.value })}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-0.5">Apelido no Futvôlei</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Biel"
+                          value={formData.player2Nickname}
+                          onChange={(e) => setFormData({ ...formData, player2Nickname: e.target.value })}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-0.5">WhatsApp / Fone</label>
+                        <input
+                          type="text"
+                          placeholder="(11) 98765-4322"
+                          value={formData.player2Phone}
+                          onChange={(e) => setFormData({ ...formData, player2Phone: e.target.value })}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-0.5">Instagram</label>
+                        <input
+                          type="text"
+                          placeholder="@atleta2"
+                          value={formData.player2Instagram}
+                          onChange={(e) => setFormData({ ...formData, player2Instagram: e.target.value })}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-0.5">Camisa</label>
+                        <select
+                          value={formData.player2ShirtSize}
+                          onChange={(e) => setFormData({ ...formData, player2ShirtSize: e.target.value })}
+                          className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
+                        >
+                          {SHIRT_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Athlete 2 Custom Fee */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-slate-800/80">
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-0.5 flex items-center justify-between">
+                          <span>Taxa de Inscrição Atleta 2 (R$)</span>
+                          <span className="text-[10px] text-emerald-400 font-semibold">Cota individual</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">R$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="5"
+                            placeholder={String(modalCat?.entryFee || 70)}
+                            value={formData.player2Fee ?? ''}
+                            onChange={(e) => setFormData({ ...formData, player2Fee: e.target.value })}
+                            className="w-full pl-8 pr-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-emerald-400 font-bold focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-end pb-1 text-[10px] text-slate-500">
+                        {p2DetectedOther.length > 0 
+                          ? '💡 2ª Categoria: valor especial para o atleta.' 
+                          : `Padrão da categoria: R$ ${modalCat?.entryFee || 70}.`}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-0.5">Camisa</label>
-                    <select
-                      value={formData.player2ShirtSize}
-                      onChange={(e) => setFormData({ ...formData, player2ShirtSize: e.target.value })}
-                      className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
-                    >
-                      {SHIRT_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                </div>
-              </div>
 
               {/* Extras & Seed & Payment */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1083,9 +1287,11 @@ export default function TeamsManager({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+          );
+        })()}
+      </div>
+    </div>
+  )}
 
       {/* Social Card Preview Modal */}
       {sharePreviewTeam && (

@@ -17,7 +17,8 @@ export default function CategoryManager({
     name: '',
     shortName: '',
     description: '',
-    entryFee: 140,
+    entryFee: 70, // por atleta
+    secondCategoryFee: 50, // valor opcional para 2ª categoria
     maxTeams: 16,
     pointsToWin: 18,
     setsToWin: 1,
@@ -31,7 +32,8 @@ export default function CategoryManager({
       name: '',
       shortName: '',
       description: '',
-      entryFee: 140,
+      entryFee: 70,
+      secondCategoryFee: 50,
       maxTeams: 16,
       pointsToWin: 18,
       setsToWin: 1,
@@ -47,7 +49,8 @@ export default function CategoryManager({
       name: cat.name,
       shortName: cat.shortName,
       description: cat.description || '',
-      entryFee: cat.entryFee || 140,
+      entryFee: cat.entryFee || 70,
+      secondCategoryFee: cat.secondCategoryFee !== undefined && cat.secondCategoryFee !== null ? cat.secondCategoryFee : '',
       maxTeams: cat.maxTeams || 16,
       pointsToWin: cat.pointsToWin || 18,
       setsToWin: cat.setsToWin || 1,
@@ -61,12 +64,20 @@ export default function CategoryManager({
     e.preventDefault();
     if (!formData.name.trim()) return;
 
+    const dataToSave = {
+      ...formData,
+      entryFee: Number(formData.entryFee || 0),
+      secondCategoryFee: formData.secondCategoryFee !== '' && formData.secondCategoryFee !== null && !isNaN(formData.secondCategoryFee)
+        ? Number(formData.secondCategoryFee)
+        : null,
+    };
+
     if (editingCategory) {
-      setCategories(categories.map(c => c.id === editingCategory.id ? { ...c, ...formData } : c));
+      setCategories(categories.map(c => c.id === editingCategory.id ? { ...c, ...dataToSave } : c));
     } else {
       const newCat = {
         id: `cat-${Date.now()}`,
-        ...formData,
+        ...dataToSave,
         shortName: formData.shortName || formData.name.substring(0, 4).toUpperCase(),
       };
       setCategories([...categories, newCat]);
@@ -235,10 +246,16 @@ export default function CategoryManager({
 
                 <div>
                   <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                    <DollarSign className="w-3 h-3 text-emerald-400" /> Inscrição
+                    <DollarSign className="w-3 h-3 text-emerald-400" /> Inscrição / Atleta
                   </span>
                   <p className="text-sm font-bold text-emerald-400 mt-0.5">
-                    R$ {cat.entryFee}
+                    R$ {cat.entryFee} <span className="text-[10px] text-slate-400 font-normal">/ atleta</span>
+                  </p>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    Dupla: R$ {(Number(cat.entryFee) || 0) * 2}
+                    {cat.secondCategoryFee ? (
+                      <span className="text-amber-400 ml-1.5 font-semibold">• 2ª Cat: R$ {cat.secondCategoryFee}</span>
+                    ) : null}
                   </p>
                 </div>
 
@@ -281,7 +298,7 @@ export default function CategoryManager({
       {/* Modal Create / Edit */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
             <h3 className="text-xl font-bold font-display text-white">
               {editingCategory ? 'Editar Categoria' : 'Nova Categoria'}
             </h3>
@@ -299,8 +316,8 @@ export default function CategoryManager({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-1">
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Sigla / Código</label>
                   <input
                     type="text"
@@ -311,16 +328,40 @@ export default function CategoryManager({
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Taxa de Inscrição (R$)</label>
+                <div className="sm:col-span-1">
+                  <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                    <span>Taxa / Atleta (R$) *</span>
+                  </label>
                   <input
                     type="number"
                     min="0"
                     step="5"
+                    required
                     value={formData.entryFee}
                     onChange={(e) => setFormData({ ...formData, entryFee: Number(e.target.value) })}
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-emerald-400 font-bold focus:outline-none focus:border-purple-500"
                   />
+                  <span className="text-[10px] text-slate-500 block mt-0.5">
+                    Dupla: R$ {(Number(formData.entryFee) || 0) * 2}
+                  </span>
+                </div>
+
+                <div className="sm:col-span-1">
+                  <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                    <span>2ª Categoria (R$)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="5"
+                    placeholder="Opcional"
+                    value={formData.secondCategoryFee ?? ''}
+                    onChange={(e) => setFormData({ ...formData, secondCategoryFee: e.target.value === '' ? '' : Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-amber-400 font-bold focus:outline-none focus:border-purple-500"
+                  />
+                  <span className="text-[10px] text-slate-500 block mt-0.5">
+                    Desconto 2ª inscrição
+                  </span>
                 </div>
               </div>
 

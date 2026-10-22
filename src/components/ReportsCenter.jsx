@@ -84,7 +84,7 @@ export default function ReportsCenter({
       const matchCat = selectedCategoryFilter === 'ALL' || team.categoryId === selectedCategoryFilter;
       
       const cat = categories.find(c => c.id === team.categoryId);
-      const entryFee = cat ? cat.entryFee : 140;
+      const entryFee = cat ? cat.entryFee : 70;
       const p1 = getAthletePayment(team, 1, entryFee);
       const p2 = getAthletePayment(team, 2, entryFee);
 
@@ -127,7 +127,7 @@ export default function ReportsCenter({
 
     filteredTeams.forEach(team => {
       const cat = categories.find(c => c.id === team.categoryId);
-      const fee = cat ? cat.entryFee : 140;
+      const fee = cat ? cat.entryFee : 70;
       const p1 = getAthletePayment(team, 1, fee);
       const p2 = getAthletePayment(team, 2, fee);
 
@@ -210,12 +210,11 @@ export default function ReportsCenter({
 
     filteredTeams.forEach(t => {
       const cat = categories.find(c => c.id === t.categoryId);
-      const fee = cat ? cat.entryFee : 140;
-      expected += fee;
-
+      const fee = cat ? cat.entryFee : 70;
       const p1 = getAthletePayment(t, 1, fee);
       const p2 = getAthletePayment(t, 2, fee);
 
+      expected += (p1.fee + p2.fee);
       collected += (Number(p1.amount) || 0) + (Number(p2.amount) || 0);
       if (p1.status === 'PAID_FULL' || p1.status === 'EXEMPT') paidAthletes++;
       if (p2.status === 'PAID_FULL' || p2.status === 'EXEMPT') paidAthletes++;
@@ -249,11 +248,12 @@ export default function ReportsCenter({
       csvContent += 'Dupla;Categoria;Jogador 1;Pago 1;Método 1;Jogador 2;Pago 2;Método 2;Total Dupla Pago;Status\r\n';
       filteredTeams.forEach(t => {
         const cat = categories.find(c => c.id === t.categoryId);
-        const fee = cat ? cat.entryFee : 140;
+        const fee = cat ? cat.entryFee : 70;
         const p1 = getAthletePayment(t, 1, fee);
         const p2 = getAthletePayment(t, 2, fee);
         const total = p1.amount + p2.amount;
-        const status = total >= fee ? 'QUITADO' : total > 0 ? 'PARCIAL (50%)' : 'PENDENTE';
+        const teamExpected = p1.fee + p2.fee;
+        const status = (p1.status === 'PAID_FULL' && p2.status === 'PAID_FULL') || total >= teamExpected ? 'QUITADO' : total > 0 ? 'PARCIAL' : 'PENDENTE';
         csvContent += `"${t.displayName}";"${cat?.name || ''}";"${t.player1?.name || ''}";"${p1.amount}";"${p1.method || 'PIX'}";"${t.player2?.name || ''}";"${p2.amount}";"${p2.method || 'PIX'}";"${total}";"${status}"\r\n`;
       });
     } else if (activeReportType === 'REGATAS') {
@@ -754,11 +754,12 @@ export default function ReportsCenter({
                 ) : (
                   filteredTeams.map((team, index) => {
                     const cat = categories.find(c => c.id === team.categoryId);
-                    const entryFee = cat ? cat.entryFee : 140;
+                    const entryFee = cat ? cat.entryFee : 70;
                     const p1 = getAthletePayment(team, 1, entryFee);
                     const p2 = getAthletePayment(team, 2, entryFee);
                     const teamTotal = p1.amount + p2.amount;
-                    const isPaid = teamTotal >= entryFee;
+                    const teamExpectedFee = p1.fee + p2.fee;
+                    const isPaid = (p1.status === 'PAID_FULL' && p2.status === 'PAID_FULL') || teamTotal >= teamExpectedFee;
 
                     return (
                       <tr key={team.id} className="hover:bg-slate-900/40 print:hover:bg-transparent">
@@ -943,7 +944,7 @@ export default function ReportsCenter({
                             )}
                             {customFields.teamPaymentTotal && (
                               <td className="py-2.5 px-3 font-mono font-bold text-white print:text-black">
-                                R$ {teamTotal} / R$ {entryFee}
+                                R$ {teamTotal} / R$ {teamExpectedFee}
                               </td>
                             )}
                             {customFields.paymentMethod && (

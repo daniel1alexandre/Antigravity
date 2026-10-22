@@ -66,36 +66,57 @@ function buildDaySchedule({
   startMatchCounter = 1,
 }) {
   const slot = Number(matchDuration) + Number(warmupDuration) + Number(courtSwitchDuration);
-  const startMins = timeToMinutes(startTime);
+  const dayStartMins = timeToMinutes(dayInfo.startTime || startTime || '08:00');
   const n = Math.max(activeCourts.length, 1);
-  const free = new Array(n).fill(startMins);
+  const free = new Array(n).fill(dayStartMins);
   const all = [];
   const sums = [];
   let counter = startMatchCounter;
 
-  orderedCategoryEntries.forEach(({ category: cat, matchesList }) => {
-    const catStart = Math.min(...free);
+  // Sort category entries by their configured start time for this day
+  const sortedCategoryEntries = [...orderedCategoryEntries].sort((a, b) => {
+    const tA = timeToMinutes(dayInfo.categoryStartTimes?.[a.category.id] || dayInfo.startTime || startTime || '08:00');
+    const tB = timeToMinutes(dayInfo.categoryStartTimes?.[b.category.id] || dayInfo.startTime || startTime || '08:00');
+    return tA - tB;
+  });
+
+  sortedCategoryEntries.forEach(({ category: cat, matchesList }) => {
+    const desiredCatStartTime = dayInfo.categoryStartTimes?.[cat.id] || dayInfo.startTime || startTime || '08:00';
+    const desiredCatStartMins = timeToMinutes(desiredCatStartTime);
+
     const cc = categoryCourtsConfig[cat.id];
     let allowed = (!cc || cc === 'ALL')
       ? activeCourts.map((_, i) => i)
       : activeCourts.map((c, i) => (Array.isArray(cc) && cc.includes(c.id) ? i : -1)).filter(i => i !== -1);
     if (!allowed.length) allowed = activeCourts.map((_, i) => i);
 
+    const catMatches = [];
+
     matchesList.forEach(item => {
-      let ci = allowed[0], ef = free[ci];
+      // Find the allowed court that is ready earliest (considering the category start time)
+      let bestCourt = allowed[0];
+      let bestReadyTime = Math.max(free[bestCourt], desiredCatStartMins);
+
       for (let i = 1; i < allowed.length; i++) {
-        const x = allowed[i];
-        if (free[x] < ef) { ef = free[x]; ci = x; }
+        const c = allowed[i];
+        const readyTime = Math.max(free[c], desiredCatStartMins);
+        if (readyTime < bestReadyTime) {
+          bestReadyTime = readyTime;
+          bestCourt = c;
+        } else if (readyTime === bestReadyTime && free[c] < free[bestCourt]) {
+          bestCourt = c;
+        }
       }
-      let s = ef;
-      const co = activeCourts[ci] || { id: `court-${ci + 1}`, name: `Quadra ${ci + 1}` };
-      all.push({
+
+      const s = bestReadyTime;
+      const co = activeCourts[bestCourt] || { id: `court-${bestCourt + 1}`, name: `Quadra ${bestCourt + 1}` };
+
+      const matchObj = {
         ...item,
         dayId: dayInfo.id,
         dayName: dayInfo.name,
         dayDate: dayInfo.date,
-        matchOrder: counter++,
-        courtIndex: ci,
+        courtIndex: bestCourt,
         court: co,
         slotStartMins: s,
         slotEndMins: s + slot,
@@ -104,34 +125,61 @@ function buildDaySchedule({
         gameStartTime: minutesToTime(s + Number(warmupDuration)),
         gameEndTime: minutesToTime(s + Number(warmupDuration) + Number(matchDuration)),
         slotEndTime: minutesToTime(s + slot),
-      });
-      free[ci] = s + slot;
+      };
+
+      catMatches.push(matchObj);
+      all.push(matchObj);
+      free[bestCourt] = s + slot;
     });
 
-    const catEnd = Math.max(...free);
-    const dm = catEnd - catStart;
+    const catActualStart = catMatches.length > 0
+      ? Math.min(...catMatches.map(m => m.slotStartMins))
+      : desiredCatStartMins;
+    const catActualEnd = catMatches.length > 0
+      ? Math.max(...catMatches.map(m => m.slotEndMins))
+      : desiredCatStartMins;
+    const dm = catActualEnd - catActualStart;
+
     sums.push({
       category: cat,
       dayId: dayInfo.id,
       dayName: dayInfo.name,
       dayDate: dayInfo.date,
       matchesCount: matchesList.length,
-      startTimeFormatted: minutesToTime(catStart),
-      endTimeFormatted: minutesToTime(catEnd),
+      configuredStartTime: desiredCatStartTime,
+      startTimeFormatted: minutesToTime(catActualStart),
+      endTimeFormatted: minutesToTime(catActualEnd),
       durationHours: (dm / 60).toFixed(1),
       durationMins: dm,
+      delayed: catMatches.length > 0 && catActualStart > desiredCatStartMins,
+      delayMinutes: catMatches.length > 0 ? Math.max(0, catActualStart - desiredCatStartMins) : 0,
     });
   });
 
-  const end = Math.max(...free, startMins);
+  // Sort matches chronologically across all categories on this day
+  all.sort((a, b) => {
+    if (a.slotStartMins !== b.slotStartMins) {
+      return a.slotStartMins - b.slotStartMins;
+    }
+    return a.courtIndex - b.courtIndex;
+  });
+
+  all.forEach(m => {
+    m.matchOrder = counter++;
+  });
+
+  const dayActualStart = all.length > 0 ? Math.min(...all.map(m => m.slotStartMins)) : dayStartMins;
+  const dayActualEnd = all.length > 0 ? Math.max(...all.map(m => m.slotEndMins)) : dayStartMins;
+  const dayDurationMins = dayActualEnd - dayActualStart;
+
   return {
     scheduledMatches: all,
     categorySummaries: sums,
     dayStats: {
       totalMatches: all.length,
-      dayStartTime: startTime,
-      dayEndTime: minutesToTime(end),
-      dayDurationHours: ((end - startMins) / 60).toFixed(1),
+      dayStartTime: minutesToTime(dayActualStart),
+      dayEndTime: minutesToTime(dayActualEnd),
+      dayDurationHours: (dayDurationMins / 60).toFixed(1),
       courtsUsed: n,
       totalSlotMinutes: slot,
     },
@@ -192,7 +240,7 @@ function buildMultiDaySchedule({
       totalDays: days.length,
       courtsUsed: sharedParams.activeCourts.length,
       totalSlotMinutes: totalSlot,
-      tournamentStartTime: days[0]?.startTime || '08:00',
+      tournamentStartTime: daysResults[0]?.dayStats?.dayStartTime || days[0]?.startTime || '08:00',
       tournamentEndTime: daysResults[daysResults.length - 1]?.dayStats?.dayEndTime || '18:00',
     },
   };
@@ -720,7 +768,10 @@ export default function ScheduleManager({
   // ─── Multi-Day State Initialization ───
   const [days, setDays] = useState(() => {
     if (savedConfig.days && Array.isArray(savedConfig.days) && savedConfig.days.length > 0) {
-      return savedConfig.days;
+      return savedConfig.days.map(d => ({
+        ...d,
+        categoryStartTimes: d.categoryStartTimes && typeof d.categoryStartTimes === 'object' ? d.categoryStartTimes : {},
+      }));
     }
     // Backward compatibility: create Day 1 with current categoryOrder or all categories
     const initialCategoryIds = (savedConfig.categoryOrder && Array.isArray(savedConfig.categoryOrder) && savedConfig.categoryOrder.length > 0)
@@ -734,6 +785,7 @@ export default function ScheduleManager({
         date: eventInfo?.date || '2026-09-05',
         startTime: savedConfig.startTime || '08:00',
         categoryIds: initialCategoryIds,
+        categoryStartTimes: {},
       }
     ];
   });
@@ -777,6 +829,7 @@ export default function ScheduleManager({
       date: nextDate,
       startTime: '08:00',
       categoryIds: [],
+      categoryStartTimes: {},
     };
     setDays([...days, newDay]);
   };
@@ -800,15 +853,48 @@ export default function ScheduleManager({
     setDays(prev => prev.map(d => d.id === dayId ? { ...d, [field]: value } : d));
   };
 
+  const handleUpdateCategoryStartTime = (dayId, categoryId, newTime) => {
+    setDays(prev => prev.map(d => {
+      if (d.id !== dayId) return d;
+      return {
+        ...d,
+        categoryStartTimes: {
+          ...(d.categoryStartTimes || {}),
+          [categoryId]: newTime,
+        },
+      };
+    }));
+  };
+
+  const handleSortCategoriesByStartTime = (dayId) => {
+    setDays(prev => prev.map(d => {
+      if (d.id !== dayId) return d;
+      const sortedIds = [...d.categoryIds].sort((idA, idB) => {
+        const timeA = timeToMinutes(d.categoryStartTimes?.[idA] || d.startTime || '08:00');
+        const timeB = timeToMinutes(d.categoryStartTimes?.[idB] || d.startTime || '08:00');
+        return timeA - timeB;
+      });
+      return { ...d, categoryIds: sortedIds };
+    }));
+  };
+
   const handleToggleCategoryInDay = (dayId, categoryId) => {
     setDays(prev => prev.map(d => {
       if (d.id === dayId) {
         const exists = d.categoryIds.includes(categoryId);
+        const nextCategoryIds = exists
+          ? d.categoryIds.filter(id => id !== categoryId)
+          : [...d.categoryIds, categoryId];
+
+        const nextStartTimes = { ...(d.categoryStartTimes || {}) };
+        if (!exists && !nextStartTimes[categoryId]) {
+          nextStartTimes[categoryId] = d.startTime || '08:00';
+        }
+
         return {
           ...d,
-          categoryIds: exists
-            ? d.categoryIds.filter(id => id !== categoryId)
-            : [...d.categoryIds, categoryId],
+          categoryIds: nextCategoryIds,
+          categoryStartTimes: nextStartTimes,
         };
       } else {
         // Exclude category from other days so it's assigned to one day
@@ -833,7 +919,18 @@ export default function ScheduleManager({
 
   const handleQuickAssignAllUnassigned = (dayId) => {
     const unassignedIds = unassignedCategories.map(c => c.id);
-    setDays(prev => prev.map(d => d.id === dayId ? { ...d, categoryIds: [...d.categoryIds, ...unassignedIds] } : d));
+    setDays(prev => prev.map(d => {
+      if (d.id !== dayId) return d;
+      const nextStartTimes = { ...(d.categoryStartTimes || {}) };
+      unassignedIds.forEach(id => {
+        if (!nextStartTimes[id]) nextStartTimes[id] = d.startTime || '08:00';
+      });
+      return {
+        ...d,
+        categoryIds: [...d.categoryIds, ...unassignedIds],
+        categoryStartTimes: nextStartTimes,
+      };
+    }));
   };
 
   // ─── Court Allocation Handlers ───
@@ -1277,13 +1374,28 @@ export default function ScheduleManager({
 
                     {/* Ordered List of Categories within this Day */}
                     {day.categoryIds.length > 0 && (
-                      <div className="pt-2 border-t border-slate-800/60 space-y-2">
-                        <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
-                          <span>Ordem de Início das Categorias neste Dia (quem joga primeiro):</span>
-                          <span>{day.categoryIds.length} categorias</span>
+                      <div className="pt-2 border-t border-slate-800/60 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-400 font-semibold">
+                          <span className="flex items-center gap-1.5 text-slate-300 font-bold">
+                            <Clock className="w-3.5 h-3.5 text-amber-400" />
+                            Horário de Início por Categoria ({day.categoryIds.length}):
+                          </span>
+                          {!isReadOnly && (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => handleSortCategoriesByStartTime(day.id)}
+                                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-amber-500/50 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-sm active:scale-95"
+                                title="Organizar lista de categorias em ordem cronológica de horário"
+                              >
+                                <ArrowDown className="w-3 h-3 text-amber-400" />
+                                <span>Ordenar por Horário</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="space-y-2.5">
                           {day.categoryIds.map((catId, catIdx) => {
                             const cat = categories.find(c => c.id === catId);
                             if (!cat) return null;
@@ -1292,50 +1404,81 @@ export default function ScheduleManager({
                             const catCourts = categoryCourtsConfig[cat.id];
                             const isAllCourts = !catCourts || catCourts === 'ALL';
                             const summaryItem = dayOficialRes?.categorySummaries?.find(s => s.category.id === cat.id);
+                            const currentCatStartTime = day.categoryStartTimes?.[cat.id] || day.startTime || '08:00';
 
                             return (
                               <div
                                 key={cat.id}
-                                className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                                className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 transition-all flex flex-col xl:flex-row xl:items-center justify-between gap-3.5"
                               >
-                                <div className="flex items-center gap-2.5">
-                                  <div className="w-6 h-6 rounded-md bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-xs">
+                                {/* Left: Cat Info */}
+                                <div className="flex items-center gap-2.5 min-w-[200px]">
+                                  <div className="w-6 h-6 rounded-md bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-xs flex-shrink-0">
                                     {catIdx + 1}º
                                   </div>
                                   <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#F59E0B' }} />
                                   <div>
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
                                       <span className="font-bold text-white text-xs">{cat.name}</span>
                                       <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">{cat.shortName}</span>
                                     </div>
                                     {summaryItem && (
                                       <p className="text-[11px] text-slate-400 mt-0.5">
-                                        {summaryItem.matchesCount} partidas • ~{summaryItem.durationHours}h
+                                        {summaryItem.matchesCount} partidas • ~{summaryItem.durationHours}h de jogos
                                       </p>
                                     )}
                                   </div>
                                 </div>
 
-                                <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60">
+                                {/* Middle: Category Start Time Input & Calculation */}
+                                <div className="flex flex-wrap items-center gap-3">
+                                  {/* Start Time Input */}
+                                  <div className="flex items-center gap-2 bg-slate-900 border border-slate-700/80 hover:border-amber-500/60 rounded-xl px-2.5 py-1.5 focus-within:border-amber-500 transition-all">
+                                    <Clock className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                                    <div className="flex flex-col">
+                                      <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Início dos Jogos</span>
+                                      <input
+                                        type="time"
+                                        value={currentCatStartTime}
+                                        onChange={e => handleUpdateCategoryStartTime(day.id, cat.id, e.target.value)}
+                                        disabled={isReadOnly}
+                                        className="bg-transparent text-white font-mono font-bold text-xs focus:outline-none cursor-pointer"
+                                        title="Definir horário de início dos jogos desta categoria"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Calculated Timeline Result */}
                                   {summaryItem && (
-                                    <div className="text-left sm:text-right">
-                                      <div className="flex items-center gap-1 text-xs font-mono font-bold text-amber-400">
-                                        <Clock className="w-3 h-3 text-slate-400" />
+                                    <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center">
+                                      <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Previsão Calculada</span>
+                                      <div className="flex items-center gap-1 font-mono text-xs font-bold text-emerald-400">
                                         <span>{summaryItem.startTimeFormatted}</span>
                                         <span className="text-slate-500">➔</span>
-                                        <span className="text-emerald-400">{summaryItem.endTimeFormatted}</span>
+                                        <span>{summaryItem.endTimeFormatted}</span>
                                       </div>
                                     </div>
                                   )}
 
+                                  {summaryItem?.delayed && (
+                                    <div className="text-[10px] text-amber-400 font-semibold bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20">
+                                      ⚠️ Quadra liberará às {summaryItem.startTimeFormatted}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Right: Court Allocation & Order Buttons */}
+                                <div className="flex items-center justify-between xl:justify-end gap-3 pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-800/60">
                                   {/* Court selector for this category */}
                                   <div className="flex items-center gap-1">
+                                    <span className="text-[10px] text-slate-500 hidden sm:inline mr-1">Quadras:</span>
                                     <button
                                       type="button"
                                       onClick={() => !isReadOnly && handleSetCategoryCourts(cat.id, 'ALL')}
                                       className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold transition-all cursor-pointer ${
-                                        isAllCourts ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                                        isAllCourts ? 'bg-amber-500 text-slate-950 font-bold shadow-sm' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
                                       }`}
+                                      title="Usar todas as quadras ativas"
                                     >
                                       Todas
                                     </button>
@@ -1349,6 +1492,7 @@ export default function ScheduleManager({
                                           className={`px-1.5 py-0.5 rounded-lg text-[10px] font-semibold transition-all cursor-pointer ${
                                             isSelected ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold' : 'bg-slate-900 text-slate-500 hover:text-slate-300 border border-slate-800'
                                           }`}
+                                          title={`Restringir à ${c.name}`}
                                         >
                                           {c.name.replace('Quadra ', 'Q')}
                                         </button>
@@ -1366,6 +1510,7 @@ export default function ScheduleManager({
                                         className={`p-1 rounded-lg border transition-all ${
                                           isFirst ? 'bg-slate-900 border-slate-800 text-slate-700 cursor-not-allowed' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 cursor-pointer active:scale-95'
                                         }`}
+                                        title="Subir posição"
                                       >
                                         <ArrowUp className="w-3.5 h-3.5" />
                                       </button>
@@ -1376,6 +1521,7 @@ export default function ScheduleManager({
                                         className={`p-1 rounded-lg border transition-all ${
                                           isLast ? 'bg-slate-900 border-slate-800 text-slate-700 cursor-not-allowed' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 cursor-pointer active:scale-95'
                                         }`}
+                                        title="Descer posição"
                                       >
                                         <ArrowDown className="w-3.5 h-3.5" />
                                       </button>

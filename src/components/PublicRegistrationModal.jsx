@@ -11,8 +11,10 @@ import {
   Tag,
   Trophy,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  RefreshCw
 } from 'lucide-react';
+import { getAthleteOtherCategories } from '../types/tournament';
 
 export default function PublicRegistrationModal({
   isOpen,
@@ -71,6 +73,21 @@ export default function PublicRegistrationModal({
       return;
     }
 
+    // Check if athletes are in a second category
+    const otherCats1 = getAthleteOtherCategories({ name: player1Name, phone: player1Phone }, teams, categories, null, selectedCatId);
+    const otherCats2 = getAthleteOtherCategories({ name: player2Name, phone: player2Phone }, teams, categories, null, selectedCatId);
+
+    const isP1SecondCat = otherCats1.length > 0;
+    const isP2SecondCat = otherCats2.length > 0;
+
+    const p1Fee = isP1SecondCat && currentCategory?.secondCategoryFee !== undefined && currentCategory?.secondCategoryFee !== null
+      ? Number(currentCategory.secondCategoryFee)
+      : Number(currentCategory?.entryFee || 70);
+
+    const p2Fee = isP2SecondCat && currentCategory?.secondCategoryFee !== undefined && currentCategory?.secondCategoryFee !== null
+      ? Number(currentCategory.secondCategoryFee)
+      : Number(currentCategory?.entryFee || 70);
+
     const newTeam = {
       id: `team-${Date.now()}`,
       categoryId: selectedCatId,
@@ -87,12 +104,26 @@ export default function PublicRegistrationModal({
         phone: player1Phone.trim(),
         nickname: '',
         shirtSize: 'M',
+        payment: {
+          status: 'PENDING',
+          method: 'PIX',
+          amount: 0,
+          fee: p1Fee,
+          isSecondCategory: isP1SecondCat,
+        }
       },
       player2: {
         name: player2Name.trim(),
         phone: player2Phone.trim(),
         nickname: '',
         shirtSize: 'M',
+        payment: {
+          status: 'PENDING',
+          method: 'PIX',
+          amount: 0,
+          fee: p2Fee,
+          isSecondCategory: isP2SecondCat,
+        }
       },
     };
 
@@ -103,6 +134,11 @@ export default function PublicRegistrationModal({
     setSuccessData({
       team: newTeam,
       category: currentCategory,
+      p1Fee,
+      p2Fee,
+      totalFee: p1Fee + p2Fee,
+      isP1SecondCat,
+      isP2SecondCat,
     });
   };
 
@@ -221,12 +257,25 @@ export default function PublicRegistrationModal({
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5" />
-                      Pagamento via PIX da Inscrição
+                      Pagamento via PIX da Inscrição (Dupla)
                     </span>
                     <span className="text-xs font-black text-white bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-800">
-                      R$ {successData.category?.entryFee || 140},00
+                      R$ {successData.totalFee || (successData.category?.entryFee ? successData.category.entryFee * 2 : 140)},00
                     </span>
                   </div>
+
+                  {(successData.isP1SecondCat || successData.isP2SecondCat) && (
+                    <div className="p-2.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-[11px] text-purple-200 text-left space-y-1">
+                      <div className="font-bold flex items-center gap-1 text-purple-300">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin-slow" />
+                        Identificada 2ª Categoria para atleta da dupla:
+                      </div>
+                      <div className="text-[10px] text-slate-300 space-y-0.5 pl-4">
+                        <div>• {successData.team.player1.name}: R$ {successData.p1Fee},00 {successData.isP1SecondCat ? '(Tarifa 2ª Categoria)' : '(1ª Categoria)'}</div>
+                        <div>• {successData.team.player2.name}: R$ {successData.p2Fee},00 {successData.isP2SecondCat ? '(Tarifa 2ª Categoria)' : '(1ª Categoria)'}</div>
+                      </div>
+                    </div>
+                  )}
 
                   <p className="text-xs text-slate-300">
                     Efetue a transferência para confirmar sua participação:
@@ -303,7 +352,10 @@ export default function PublicRegistrationModal({
                   </label>
                   {currentCategory && (
                     <span className="text-[11px] text-amber-400 font-bold">
-                      Inscrição: R$ {currentCategory.entryFee},00
+                      R$ {currentCategory.entryFee} / atleta (R$ {currentCategory.entryFee * 2} dupla)
+                      {currentCategory.secondCategoryFee && (
+                        <span className="text-purple-300 ml-1.5">• 2ª Cat: R$ {currentCategory.secondCategoryFee}</span>
+                      )}
                     </span>
                   )}
                 </div>
@@ -336,7 +388,15 @@ export default function PublicRegistrationModal({
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2">
-                          <span className="font-semibold text-amber-300">R$ {cat.entryFee}</span>
+                          <div>
+                            <span className="font-semibold text-amber-300">R$ {cat.entryFee}</span>
+                            <span className="text-[10px] text-slate-400"> / atleta</span>
+                            {cat.secondCategoryFee && (
+                              <span className="text-[10px] text-purple-400 font-semibold block">
+                                2ª Cat: R$ {cat.secondCategoryFee}
+                              </span>
+                            )}
+                          </div>
                           <span>{catTeamsCount} / {catMax} vagas</span>
                         </div>
                       </button>

@@ -40,7 +40,8 @@ export function normalizeEventInfo(info = {}, defaultName = 'Novo Torneio de Fut
           name: 'Dia 1',
           date: eventInfo.date || '2026-09-05',
           startTime: '08:00',
-          categoryIds: []
+          categoryIds: [],
+          categoryStartTimes: {}
         }
       ],
       lunchBreak: {
@@ -58,9 +59,16 @@ export function normalizeEventInfo(info = {}, defaultName = 'Novo Torneio de Fut
         startTime: eventInfo.scheduleConfig.startTime || '08:00',
         categoryIds: Array.isArray(eventInfo.scheduleConfig.categoryOrder) && eventInfo.scheduleConfig.categoryOrder.length > 0
           ? eventInfo.scheduleConfig.categoryOrder
-          : []
+          : [],
+        categoryStartTimes: {}
       }
     ];
+  } else {
+    // Ensure all existing days have categoryStartTimes object
+    eventInfo.scheduleConfig.days = eventInfo.scheduleConfig.days.map(d => ({
+      ...d,
+      categoryStartTimes: d.categoryStartTimes && typeof d.categoryStartTimes === 'object' ? d.categoryStartTimes : {}
+    }));
   }
   return eventInfo;
 }
@@ -198,7 +206,7 @@ export function createNewTournament(customInfo = {}) {
       pixKey: '',
       pixReceiver: '',
       pixBank: '',
-      defaultEntryFee: 140,
+      defaultEntryFee: 70,
       expenses: [],
       sponsors: [],
       ...customInfo,

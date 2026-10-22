@@ -25,7 +25,8 @@ export const DEFAULT_CATEGORIES = [
     name: 'Iniciante',
     shortName: 'INI',
     description: 'Atletas que começaram recentemente no futvôlei',
-    entryFee: 120,
+    entryFee: 60, // Valor por atleta (R$ 120 por dupla)
+    secondCategoryFee: 40, // Valor com desconto para 2ª categoria
     maxTeams: 16,
     pointsToWin: 18,
     setsToWin: 1, // 1 set to 18
@@ -37,7 +38,8 @@ export const DEFAULT_CATEGORIES = [
     name: 'Categoria C (Bronze)',
     shortName: 'CAT-C',
     description: 'Jogadores intermediários nível bronze',
-    entryFee: 140,
+    entryFee: 70, // Valor por atleta (R$ 140 por dupla)
+    secondCategoryFee: 50,
     maxTeams: 16,
     pointsToWin: 18,
     setsToWin: 1,
@@ -49,7 +51,8 @@ export const DEFAULT_CATEGORIES = [
     name: 'Categoria B (Prata)',
     shortName: 'CAT-B',
     description: 'Nível avançado prata com experiência em torneios',
-    entryFee: 160,
+    entryFee: 80, // Valor por atleta (R$ 160 por dupla)
+    secondCategoryFee: 60,
     maxTeams: 16,
     pointsToWin: 18,
     setsToWin: 1,
@@ -61,7 +64,8 @@ export const DEFAULT_CATEGORIES = [
     name: 'Categoria A / Open (Ouro)',
     shortName: 'OPEN',
     description: 'Categoria principal com os melhores atletas',
-    entryFee: 200,
+    entryFee: 100, // Valor por atleta (R$ 200 por dupla)
+    secondCategoryFee: 70,
     maxTeams: 16,
     pointsToWin: 21,
     setsToWin: 1,
@@ -73,7 +77,8 @@ export const DEFAULT_CATEGORIES = [
     name: 'Misto (Masc + Fem)',
     shortName: 'MISTO',
     description: 'Duplas formadas por um atleta masculino e uma feminina',
-    entryFee: 140,
+    entryFee: 70, // Valor por atleta (R$ 140 por dupla)
+    secondCategoryFee: 50,
     maxTeams: 16,
     pointsToWin: 18,
     setsToWin: 1,
@@ -92,11 +97,66 @@ export const DEFAULT_COURTS = [
 ];
 
 /**
- * Helper to get athlete payment details with fallback to team-level values
+ * Detects if an athlete is already enrolled in another category in the tournament
+ */
+export function getAthleteOtherCategories(athlete, teams = [], categories = [], currentTeamId = null, currentCategoryId = null) {
+  if (!athlete) return [];
+  const cleanName = (athlete.name || '').trim().toLowerCase();
+  const cleanPhone = (athlete.phone || '').replace(/\D/g, '');
+
+  if (!cleanName && !cleanPhone) return [];
+
+  const otherEntries = [];
+
+  teams.forEach(t => {
+    if (currentTeamId && t.id === currentTeamId) return;
+
+    // Compare player 1
+    const p1Name = (t.player1?.name || '').trim().toLowerCase();
+    const p1Phone = (t.player1?.phone || '').replace(/\D/g, '');
+    const matchP1 = (cleanName && p1Name && p1Name === cleanName) ||
+                    (cleanPhone && cleanPhone.length >= 8 && p1Phone === cleanPhone);
+
+    // Compare player 2
+    const p2Name = (t.player2?.name || '').trim().toLowerCase();
+    const p2Phone = (t.player2?.phone || '').replace(/\D/g, '');
+    const matchP2 = (cleanName && p2Name && p2Name === cleanName) ||
+                    (cleanPhone && cleanPhone.length >= 8 && p2Phone === cleanPhone);
+
+    if (matchP1 || matchP2) {
+      const cat = categories.find(c => c.id === t.categoryId);
+      otherEntries.push({
+        teamId: t.id,
+        teamDisplayName: t.displayName,
+        categoryId: t.categoryId,
+        categoryName: cat?.name || 'Outra Categoria',
+        categoryColor: cat?.color || '#F59E0B',
+        playerNum: matchP1 ? 1 : 2,
+        isSameCategory: currentCategoryId ? t.categoryId === currentCategoryId : false,
+      });
+    }
+  });
+
+  return otherEntries;
+}
+
+/**
+ * Helper to get athlete payment details with fallback to team-level values.
+ * In the new model, category entryFee is configured PER ATHLETE.
+ * Specific athlete-level fee adjustments (e.g. 2nd category discount) are respected.
  */
 export function getAthletePayment(team, playerNum, entryFee) {
   const player = playerNum === 1 ? team?.player1 : team?.player2;
-  const athleteFee = Math.round((entryFee || 140) / 2);
+  const defaultCategoryFee = entryFee !== undefined && entryFee !== null ? Number(entryFee) : 70;
+
+  // Individual athlete fee: custom fee takes precedence, then player fee, then category entryFee
+  const hasCustomFee = (player?.payment?.fee !== undefined && player.payment.fee !== null) ||
+                       (player?.fee !== undefined && player.fee !== null);
+  const athleteFee = player?.payment?.fee !== undefined && player.payment.fee !== null
+    ? Number(player.payment.fee)
+    : (player?.fee !== undefined && player.fee !== null
+        ? Number(player.fee)
+        : defaultCategoryFee);
 
   if (player?.payment) {
     const isExempt = player.payment.status === 'EXEMPT';
@@ -107,6 +167,8 @@ export function getAthletePayment(team, playerNum, entryFee) {
       date: player.payment.date || null,
       notes: player.payment.notes || '',
       fee: isExempt ? 0 : athleteFee,
+      isCustomFee: Boolean(hasCustomFee),
+      isSecondCategory: Boolean(player.payment.isSecondCategory || player.isSecondCategory),
     };
   }
 
@@ -130,5 +192,7 @@ export function getAthletePayment(team, playerNum, entryFee) {
     date: team?.paymentDate || null,
     notes: team?.paymentNotes || '',
     fee: isExempt ? 0 : athleteFee,
+    isCustomFee: Boolean(hasCustomFee),
+    isSecondCategory: Boolean(player?.isSecondCategory),
   };
 }

@@ -25,7 +25,7 @@ import {
   ShieldCheck,
   X
 } from 'lucide-react';
-import { PAYMENT_STATUS, PAYMENT_METHODS, getAthletePayment } from '../types/tournament';
+import { PAYMENT_STATUS, PAYMENT_METHODS, getAthletePayment, getAthleteOtherCategories } from '../types/tournament';
 
 export default function PaymentControl({ 
   teams = [], 
@@ -68,6 +68,9 @@ export default function PaymentControl({
     status: 'RECEIVED', // 'RECEIVED' | 'PENDING'
     notes: '',
   });
+
+  // Modal state for editing athlete fee (cota individual / 2ª categoria)
+  const [feeModalData, setFeeModalData] = useState(null);
 
   const expensesList = Array.isArray(eventInfo?.expenses) ? eventInfo.expenses : [];
   const sponsorsList = Array.isArray(eventInfo?.sponsors) ? eventInfo.sponsors : [];
@@ -132,7 +135,7 @@ export default function PaymentControl({
 
   teams.forEach(t => {
     const cat = categories.find(c => c.id === t.categoryId);
-    const fee = cat ? cat.entryFee : 140;
+    const fee = cat ? cat.entryFee : 70;
     const p1 = getAthletePayment(t, 1, fee);
     const p2 = getAthletePayment(t, 2, fee);
 
@@ -206,7 +209,7 @@ export default function PaymentControl({
   // ==========================================
   const relevantTeams = teams.filter(team => {
     const cat = categories.find(c => c.id === team.categoryId);
-    const fee = cat ? cat.entryFee : 140;
+    const fee = cat ? cat.entryFee : 70;
     const p1 = getAthletePayment(team, 1, fee);
     const p2 = getAthletePayment(team, 2, fee);
 
@@ -239,7 +242,7 @@ export default function PaymentControl({
       if (t.id !== teamId) return t;
 
       const cat = categories.find(c => c.id === t.categoryId);
-      const entryFee = cat ? cat.entryFee : 140;
+      const entryFee = cat ? cat.entryFee : 70;
 
       const currentP1 = getAthletePayment(t, 1, entryFee);
       const currentP2 = getAthletePayment(t, 2, entryFee);
@@ -282,9 +285,9 @@ export default function PaymentControl({
   };
 
   const handleAthleteStatusChange = (teamId, playerNum, newStatus, entryFee) => {
-    const athleteFee = Math.round((entryFee || 140) / 2);
     const targetTeam = teams.find(t => t.id === teamId);
     const currentPay = targetTeam ? getAthletePayment(targetTeam, playerNum, entryFee) : null;
+    const athleteFee = currentPay?.fee !== undefined ? currentPay.fee : Number(entryFee || 70);
     const currentAmount = currentPay ? (Number(currentPay.amount) || 0) : 0;
 
     let amount = currentAmount;
@@ -303,6 +306,45 @@ export default function PaymentControl({
     });
   };
 
+  const handleOpenFeeModal = (team, playerNum) => {
+    const cat = categories.find(c => c.id === team.categoryId);
+    const entryFee = cat ? cat.entryFee : 70;
+    const athlete = playerNum === 1 ? team.player1 : team.player2;
+    const currentPay = getAthletePayment(team, playerNum, entryFee);
+    const otherCats = getAthleteOtherCategories(athlete, teams, categories, team.id);
+
+    setFeeModalData({
+      teamId: team.id,
+      playerNum,
+      athleteName: athlete?.name || `Atleta ${playerNum}`,
+      currentFee: currentPay.fee,
+      cat,
+      otherCats,
+      newFee: currentPay.fee,
+      isPaid: currentPay.status === 'PAID_FULL',
+      syncPaidAmount: currentPay.status === 'PAID_FULL',
+    });
+  };
+
+  const handleSaveAthleteFee = (e) => {
+    e.preventDefault();
+    if (!feeModalData) return;
+    const parsedFee = Number(feeModalData.newFee);
+    if (isNaN(parsedFee) || parsedFee < 0) return;
+
+    const updates = {
+      fee: parsedFee,
+      isSecondCategory: feeModalData.otherCats.length > 0 || Boolean(feeModalData.cat?.secondCategoryFee),
+    };
+
+    if (feeModalData.syncPaidAmount) {
+      updates.amount = parsedFee;
+    }
+
+    updateAthletePayment(feeModalData.teamId, feeModalData.playerNum, updates);
+    setFeeModalData(null);
+  };
+
   const sendWhatsAppAthleteBilling = (team, playerNum) => {
     if (isReadOnly) {
       alert('Modo apenas visualização: faça login para enviar mensagens.');
@@ -310,7 +352,7 @@ export default function PaymentControl({
     }
 
     const cat = categories.find(c => c.id === team.categoryId);
-    const entryFee = cat ? cat.entryFee : 140;
+    const entryFee = cat ? cat.entryFee : 70;
     const athlete = playerNum === 1 ? team.player1 : team.player2;
     const athletePayment = getAthletePayment(team, playerNum, entryFee);
 
@@ -340,7 +382,7 @@ export default function PaymentControl({
     }
 
     const cat = categories.find(c => c.id === team.categoryId);
-    const entryFee = cat ? cat.entryFee : 140;
+    const entryFee = cat ? cat.entryFee : 70;
     const athlete = playerNum === 1 ? team.player1 : team.player2;
     const athletePayment = getAthletePayment(team, playerNum, entryFee);
     const phone = athlete?.phone;
@@ -902,9 +944,12 @@ export default function PaymentControl({
                   ) : (
                     relevantTeams.map((team) => {
                       const cat = categories.find(c => c.id === team.categoryId);
-                      const entryFee = cat ? cat.entryFee : 140;
+                      const entryFee = cat ? cat.entryFee : 70;
                       const p1Payment = getAthletePayment(team, 1, entryFee);
                       const p2Payment = getAthletePayment(team, 2, entryFee);
+                      const p1OtherCats = getAthleteOtherCategories(team.player1, teams, categories, team.id);
+                      const p2OtherCats = getAthleteOtherCategories(team.player2, teams, categories, team.id);
+                      const teamTotalFee = (p1Payment.fee || 0) + (p2Payment.fee || 0);
 
                       const isTeamHighlighted = highlightedAthlete?.teamId === team.id;
                       const isP1Highlighted = isTeamHighlighted && (highlightedAthlete?.playerNum === 1 || !highlightedAthlete?.playerNum);
@@ -937,7 +982,7 @@ export default function PaymentControl({
                                   )}
                                 </div>
                                 <div className="text-[11px] font-semibold text-slate-400">
-                                  Inscrição da Dupla: <strong className="text-emerald-400">R$ {entryFee}</strong> • Total Pago: <strong className="text-amber-400">R$ {(Number(p1Payment.amount) || 0) + (Number(p2Payment.amount) || 0)}</strong>
+                                  Inscrição da Dupla: <strong className="text-emerald-400">R$ {teamTotalFee}</strong> <span className="text-slate-500 font-normal">(R$ {entryFee}/atleta)</span> • Total Pago: <strong className="text-amber-400">R$ {(Number(p1Payment.amount) || 0) + (Number(p2Payment.amount) || 0)}</strong>
                                 </div>
                               </div>
                             </td>
@@ -964,16 +1009,68 @@ export default function PaymentControl({
                                   #1
                                 </div>
                                 <div>
-                                  <p className={`font-bold ${isP1Highlighted ? 'text-amber-200' : 'text-slate-200'}`}>
-                                    {team.player1?.name || 'Jogador 1'}
-                                  </p>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <p className={`font-bold ${isP1Highlighted ? 'text-amber-200' : 'text-slate-200'}`}>
+                                      {team.player1?.name || 'Jogador 1'}
+                                    </p>
+                                    {p1OtherCats.length > 0 && (
+                                      <span 
+                                        title={`Inscrito também em: ${p1OtherCats.map(c => c.categoryName).join(', ')}`}
+                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold"
+                                      >
+                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                                        2ª Categoria
+                                      </span>
+                                    )}
+                                  </div>
                                   <p className="text-[11px] text-slate-500">{team.player1?.phone || 'Sem fone'}</p>
                                 </div>
                               </div>
                             </td>
 
                             <td className="py-3 px-3 text-slate-400">{cat?.name || 'Futvôlei'}</td>
-                            <td className="py-3 px-3 font-semibold text-slate-300">R$ {p1Payment.fee}</td>
+                            <td className="py-3 px-3">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-slate-200 text-xs">
+                                  R$ {p1Payment.fee}
+                                </span>
+                                {p1Payment.isCustomFee && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30" title="Valor personalizado para este atleta">
+                                    Ajustado
+                                  </span>
+                                )}
+                                {!isReadOnly && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenFeeModal(team, 1)}
+                                    title="Alterar valor de inscrição deste atleta (2ª categoria / cota)"
+                                    className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-purple-300 transition-colors"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                              {!isReadOnly && (p1OtherCats.length > 0 || cat?.secondCategoryFee) && (
+                                <div className="mt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const targetFee = cat?.secondCategoryFee || Math.round(entryFee * 0.7);
+                                      updateAthletePayment(team.id, 1, {
+                                        fee: targetFee,
+                                        isSecondCategory: true,
+                                        ...(p1Payment.status === 'PAID_FULL' ? { amount: targetFee } : {})
+                                      });
+                                    }}
+                                    title={`Definir valor de 2ª categoria: R$ ${cat?.secondCategoryFee || Math.round(entryFee * 0.7)}`}
+                                    className="text-[10px] font-bold text-purple-300 hover:text-purple-200 bg-purple-950/60 hover:bg-purple-900/60 border border-purple-500/30 px-1.5 py-0.5 rounded transition-all inline-flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Sparkles className="w-2.5 h-2.5 text-purple-400" />
+                                    2ª Cat: R$ {cat?.secondCategoryFee || Math.round(entryFee * 0.7)}
+                                  </button>
+                                </div>
+                              )}
+                            </td>
 
                             <td className="py-3 px-3">
                               <div className="relative w-28">
@@ -1111,16 +1208,68 @@ export default function PaymentControl({
                                   #2
                                 </div>
                                 <div>
-                                  <p className={`font-bold ${isP2Highlighted ? 'text-amber-200' : 'text-slate-200'}`}>
-                                    {team.player2?.name || 'Jogador 2'}
-                                  </p>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <p className={`font-bold ${isP2Highlighted ? 'text-amber-200' : 'text-slate-200'}`}>
+                                      {team.player2?.name || 'Jogador 2'}
+                                    </p>
+                                    {p2OtherCats.length > 0 && (
+                                      <span 
+                                        title={`Inscrito também em: ${p2OtherCats.map(c => c.categoryName).join(', ')}`}
+                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold"
+                                      >
+                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                                        2ª Categoria
+                                      </span>
+                                    )}
+                                  </div>
                                   <p className="text-[11px] text-slate-500">{team.player2?.phone || 'Sem fone'}</p>
                                 </div>
                               </div>
                             </td>
 
                             <td className="py-3 px-3 text-slate-400">{cat?.name || 'Futvôlei'}</td>
-                            <td className="py-3 px-3 font-semibold text-slate-300">R$ {p2Payment.fee}</td>
+                            <td className="py-3 px-3">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-slate-200 text-xs">
+                                  R$ {p2Payment.fee}
+                                </span>
+                                {p2Payment.isCustomFee && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30" title="Valor personalizado para este atleta">
+                                    Ajustado
+                                  </span>
+                                )}
+                                {!isReadOnly && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenFeeModal(team, 2)}
+                                    title="Alterar valor de inscrição deste atleta (2ª categoria / cota)"
+                                    className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-purple-300 transition-colors"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                              {!isReadOnly && (p2OtherCats.length > 0 || cat?.secondCategoryFee) && (
+                                <div className="mt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const targetFee = cat?.secondCategoryFee || Math.round(entryFee * 0.7);
+                                      updateAthletePayment(team.id, 2, {
+                                        fee: targetFee,
+                                        isSecondCategory: true,
+                                        ...(p2Payment.status === 'PAID_FULL' ? { amount: targetFee } : {})
+                                      });
+                                    }}
+                                    title={`Definir valor de 2ª categoria: R$ ${cat?.secondCategoryFee || Math.round(entryFee * 0.7)}`}
+                                    className="text-[10px] font-bold text-purple-300 hover:text-purple-200 bg-purple-950/60 hover:bg-purple-900/60 border border-purple-500/30 px-1.5 py-0.5 rounded transition-all inline-flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Sparkles className="w-2.5 h-2.5 text-purple-400" />
+                                    2ª Cat: R$ {cat?.secondCategoryFee || Math.round(entryFee * 0.7)}
+                                  </button>
+                                </div>
+                              )}
+                            </td>
 
                             <td className="py-3 px-3">
                               <div className="relative w-28">
@@ -1957,6 +2106,140 @@ export default function PaymentControl({
                   className="px-5 py-2 rounded-xl font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md active:scale-95"
                 >
                   Salvar Patrocínio
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Customizing Athlete Fee (2ª Categoria / Cota Individual) */}
+      {feeModalData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-lg font-bold font-display text-white flex items-center gap-2">
+                <Edit2 className="w-4 h-4 text-purple-400" />
+                Alterar Valor da Inscrição
+              </h3>
+              <button
+                onClick={() => setFeeModalData(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Atleta</span>
+              <p className="text-sm font-extrabold text-white">{feeModalData.athleteName}</p>
+              <p className="text-xs text-slate-400">
+                Categoria da dupla: <strong className="text-purple-300 font-semibold">{feeModalData.cat?.name || 'Futvôlei'}</strong>
+              </p>
+            </div>
+
+            {feeModalData.otherCats?.length > 0 && (
+              <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-xs text-purple-200 space-y-1.5">
+                <div className="flex items-center gap-1.5 font-bold text-purple-300">
+                  <Sparkles className="w-4 h-4 text-purple-400" />
+                  2ª Categoria Detectada no Torneio
+                </div>
+                <p className="text-slate-300 leading-relaxed">
+                  Este atleta já está inscrito em:{' '}
+                  <strong className="text-white font-bold">
+                    {feeModalData.otherCats.map(c => c.categoryName).join(', ')}
+                  </strong>.
+                </p>
+                <p className="text-[11px] text-purple-300/90 font-medium">
+                  Você pode aplicar um valor com desconto específico para esta 2ª categoria abaixo.
+                </p>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveAthleteFee} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span>Valor da Inscrição deste Atleta (R$) *</span>
+                  <span className="text-[11px] text-slate-400">Atual: R$ {feeModalData.currentFee}</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">R$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="5"
+                    required
+                    autoFocus
+                    value={feeModalData.newFee}
+                    onChange={(e) => setFeeModalData({ ...feeModalData, newFee: e.target.value })}
+                    className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-base text-emerald-400 font-bold focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-semibold text-slate-400 block">Sugestões rápidas:</span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFeeModalData({ ...feeModalData, newFee: feeModalData.cat?.entryFee || 70 })}
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 cursor-pointer"
+                  >
+                    Padrão (R$ {feeModalData.cat?.entryFee || 70})
+                  </button>
+                  {feeModalData.cat?.secondCategoryFee && (
+                    <button
+                      type="button"
+                      onClick={() => setFeeModalData({ ...feeModalData, newFee: feeModalData.cat.secondCategoryFee })}
+                      className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-900/40 hover:bg-purple-900/70 text-purple-300 border border-purple-500/40 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles className="w-3 h-3 text-purple-400" />
+                      2ª Categoria (R$ {feeModalData.cat.secondCategoryFee})
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setFeeModalData({ ...feeModalData, newFee: 50 })}
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 cursor-pointer"
+                  >
+                    R$ 50
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFeeModalData({ ...feeModalData, newFee: 40 })}
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 cursor-pointer"
+                  >
+                    R$ 40
+                  </button>
+                </div>
+              </div>
+
+              {feeModalData.isPaid && (
+                <label className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={feeModalData.syncPaidAmount}
+                    onChange={(e) => setFeeModalData({ ...feeModalData, syncPaidAmount: e.target.checked })}
+                    className="rounded border-slate-700 text-purple-600 focus:ring-0"
+                  />
+                  <span>Atleta já consta como PAGO: atualizar valor recebido para R$ {feeModalData.newFee || 0}</span>
+                </label>
+              )}
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setFeeModalData(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 active:scale-95 transition-all"
+                >
+                  Salvar Valor da Cota
                 </button>
               </div>
             </form>
