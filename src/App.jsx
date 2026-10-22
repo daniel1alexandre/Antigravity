@@ -409,7 +409,7 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         categories={categories}
-        selectedCategoryId={selectedCategoryId}
+        selectedCategoryId={activeCategoryId}
         setSelectedCategoryId={setSelectedCategoryId}
         tournaments={tournaments}
         activeTournamentId={activeTournamentId}

@@ -161,8 +161,12 @@ function PublicTeamsTab({ teams, categories, onOpenRegister }) {
 
 // ─── Chaveamento (View Only) ────────────────────────────────────────────────
 function PublicBracketTab({ categories, teams, brackets, eventInfo, selectedCategoryId, setSelectedCategoryId }) {
-  const currentCategory = categories.find(c => c.id === selectedCategoryId) || categories[0] || null;
-  const currentBracket = selectedCategoryId ? (brackets[selectedCategoryId] || null) : null;
+  const activeCatId = (selectedCategoryId && categories.some(c => c.id === selectedCategoryId))
+    ? selectedCategoryId
+    : (categories[0]?.id || '');
+  const currentCategory = categories.find(c => c.id === activeCatId) || categories[0] || null;
+  const currentBracket = activeCatId ? (brackets[activeCatId] || null) : null;
+  const hasValidBracket = Boolean(currentBracket && currentBracket.matches && Object.keys(currentBracket.matches).length > 0);
 
   if (categories.length === 0) {
     return (
@@ -173,52 +177,63 @@ function PublicBracketTab({ categories, teams, brackets, eventInfo, selectedCate
     );
   }
 
-  if (!currentBracket) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 space-y-3 text-center">
-        <Clock className="w-12 h-12 text-slate-700" />
-        <p className="text-slate-300 font-bold text-lg">Chave ainda não sorteada</p>
-        <p className="text-xs text-slate-500">
-          Aguarde a organização realizar o sorteio oficial para esta categoria.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       {/* Category selector */}
       <div className="flex flex-wrap gap-2">
-        {categories.map(c => (
-          <button
-            key={c.id}
-            onClick={() => setSelectedCategoryId(c.id)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              selectedCategoryId === c.id
-                ? 'bg-purple-600 text-white shadow-lg'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            {c.name}
-          </button>
-        ))}
+        {categories.map(c => {
+          const isSelected = activeCatId === c.id;
+          const hasDrawn = Boolean(brackets?.[c.id]?.matches && Object.keys(brackets[c.id].matches).length > 0);
+          return (
+            <button
+              key={c.id}
+              onClick={() => setSelectedCategoryId && setSelectedCategoryId(c.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                isSelected
+                  ? 'bg-amber-500 text-slate-950 shadow-glow-amber'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.color || '#F59E0B' }} />
+              <span>{c.name}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${
+                isSelected ? 'bg-slate-950/20 text-slate-900 font-bold' : hasDrawn ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-700/60 text-slate-400'
+              }`}>
+                {hasDrawn ? '✓ Gerada' : 'Pendente'}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Bracket (read-only: no modals, no draw, no reset) */}
-      <TournamentBracket
-        bracket={currentBracket}
-        allBrackets={brackets}
-        category={currentCategory}
-        courts={eventInfo?.courts}
-        targetMatchId={null}
-        onOpenScoreModal={() => {}}
-        onOpenCourtScoreboard={() => {}}
-        onOpenDrawModal={() => {}}
-        onResetBracket={() => {}}
-        onOpenLiveArena={() => {}}
-        onUpdateCourt={() => {}}
-        isReadOnly={true}
-      />
+      {!hasValidBracket ? (
+        <div className="flex flex-col items-center justify-center py-20 space-y-3 text-center glass-panel p-8 rounded-3xl border border-slate-800">
+          <Clock className="w-12 h-12 text-slate-600" />
+          <p className="text-slate-300 font-bold text-lg">Chave ainda não sorteada</p>
+          <p className="text-xs text-slate-400 max-w-md">
+            A chave da categoria <strong className="text-amber-400">{currentCategory?.name}</strong> ainda não foi gerada pela organização do torneio.
+          </p>
+        </div>
+      ) : (
+        /* Bracket (read-only: no modals, no draw, no reset) */
+        <TournamentBracket
+          bracket={currentBracket}
+          allBrackets={brackets}
+          category={currentCategory}
+          categories={categories}
+          selectedCategoryId={activeCatId}
+          setSelectedCategoryId={setSelectedCategoryId}
+          courts={eventInfo?.courts}
+          targetMatchId={null}
+          onOpenScoreModal={() => {}}
+          onOpenCourtScoreboard={() => {}}
+          onOpenDrawModal={() => {}}
+          onResetBracket={() => {}}
+          onOpenLiveArena={() => {}}
+          onUpdateCourt={() => {}}
+          isReadOnly={true}
+        />
+      )}
     </div>
   );
 }

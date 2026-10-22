@@ -15,37 +15,27 @@ export default function DrawModal({
   setBrackets,
   setActiveTab 
 }) {
-  const [internalCatId, setInternalCatId] = useState(() => {
-    if (selectedCategoryId && categories.some(c => c.id === selectedCategoryId)) {
-      return selectedCategoryId;
-    }
-    return categories[0]?.id || '';
-  });
-
   const [drawMode, setDrawMode] = useState('SEEDED'); // 'SEEDED' or 'RANDOM'
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawnList, setDrawnList] = useState(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [animationSteps, setAnimationSteps] = useState([]);
 
-  // Sync internalCatId whenever modal opens or selectedCategoryId changes
+  // Reset drawing states when modal opens or category changes
   React.useEffect(() => {
     if (isOpen) {
-      if (selectedCategoryId && categories.some(c => c.id === selectedCategoryId)) {
-        setInternalCatId(selectedCategoryId);
-      } else if (categories.length > 0) {
-        setInternalCatId(categories[0].id);
-      }
       setDrawnList(null);
       setIsDrawing(false);
       setCurrentStepIndex(0);
     }
-  }, [isOpen, selectedCategoryId, categories]);
+  }, [isOpen, selectedCategoryId]);
 
   if (!isOpen) return null;
 
-  const activeCategory = categories.find(c => c.id === internalCatId) || categories[0] || null;
-  const activeCatId = activeCategory?.id || '';
+  const activeCatId = (selectedCategoryId && categories.some(c => c.id === selectedCategoryId))
+    ? selectedCategoryId
+    : (categories[0]?.id || '');
+  const activeCategory = categories.find(c => c.id === activeCatId) || categories[0] || null;
 
   if (!activeCategory) {
     return (
@@ -59,7 +49,6 @@ export default function DrawModal({
   }
 
   const handleSelectCategory = (catId) => {
-    setInternalCatId(catId);
     if (setSelectedCategoryId) {
       setSelectedCategoryId(catId);
     }

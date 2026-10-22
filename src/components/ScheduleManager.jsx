@@ -1052,10 +1052,12 @@ export default function ScheduleManager({
           Object.values(bracket.matches)
             .filter(m => !m.isBye && !m.isByeMatch)
             .sort((a, b) => {
-              if (a.type !== b.type) {
-                if (a.type === 'WINNERS') return -1;
-                if (b.type === 'WINNERS') return 1;
-                if (a.type === 'LOSERS') return -1;
+              const typeA = a.bracket || a.type;
+              const typeB = b.bracket || b.type;
+              if (typeA !== typeB) {
+                if (typeA === 'WINNERS') return -1;
+                if (typeB === 'WINNERS') return 1;
+                if (typeA === 'LOSERS') return -1;
                 return 1;
               }
               return (a.round || 1) - (b.round || 1);
@@ -1063,19 +1065,23 @@ export default function ScheduleManager({
             .forEach(m => {
               const t1 = m.team1?.displayName || (m.team1?.isBye ? 'Folga' : 'A definir');
               const t2 = m.team2?.displayName || (m.team2?.isBye ? 'Folga' : 'A definir');
-              const roundName = m.type === 'GRAND_FINAL'
+              const bType = m.bracket || m.type;
+              const roundName = bType === 'GRAND_FINAL'
                 ? 'Grande Final'
-                : `${m.type === 'WINNERS' ? 'Chave Principal' : 'Repescagem'} - Rodada ${m.round || 1}`;
+                : `${bType === 'WINNERS' ? 'Chave Principal' : 'Repescagem'} - Rodada ${m.round || 1}`;
+              const matchScore = (m.score1 !== null && m.score1 !== undefined && m.score2 !== null && m.score2 !== undefined)
+                ? `${m.score1} x ${m.score2}`
+                : (m.score ? `${m.score.team1 || 0} x ${m.score.team2 || 0}` : null);
               matchesList.push({
                 id: m.id,
                 realMatchId: m.id,
                 category: cat,
                 categoryId: cat.id,
-                roundName,
+                roundName: m.roundName || roundName,
                 team1Name: t1,
                 team2Name: t2,
                 status: m.status || 'PENDING',
-                score: m.score ? `${m.score.team1 || 0} x ${m.score.team2 || 0}` : null,
+                score: matchScore,
               });
             });
         } else {

@@ -92,6 +92,9 @@ export function generateDoubleEliminationBracket(teams, category) {
       const match = {
         id: matchId,
         bracket: 'WINNERS',
+        type: 'WINNERS',
+        categoryId: category.id,
+        categoryName: category.name,
         round: r,
         roundName,
         matchNumber: matchCounter++,
@@ -151,6 +154,9 @@ export function generateDoubleEliminationBracket(teams, category) {
       const match = {
         id: matchId,
         bracket: 'LOSERS',
+        type: 'LOSERS',
+        categoryId: category.id,
+        categoryName: category.name,
         round: lr,
         roundName,
         matchNumber: matchCounter++,
@@ -237,6 +243,9 @@ export function generateDoubleEliminationBracket(teams, category) {
   const grandFinalMatch = {
     id: gfMatchId,
     bracket: 'GRAND_FINAL',
+    type: 'GRAND_FINAL',
+    categoryId: category.id,
+    categoryName: category.name,
     round: 1,
     roundName: 'Grande Final',
     matchNumber: matchCounter++,
