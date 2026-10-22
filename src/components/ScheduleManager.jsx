@@ -24,6 +24,7 @@ import {
   Tag,
   AlertCircle,
 } from 'lucide-react';
+import { getRoundPriority } from '../utils/scheduleEngine';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 function timeToMinutes(t) {
@@ -1052,13 +1053,10 @@ export default function ScheduleManager({
           Object.values(bracket.matches)
             .filter(m => !m.isBye && !m.isByeMatch)
             .sort((a, b) => {
-              const typeA = a.bracket || a.type;
-              const typeB = b.bracket || b.type;
-              if (typeA !== typeB) {
-                if (typeA === 'WINNERS') return -1;
-                if (typeB === 'WINNERS') return 1;
-                if (typeA === 'LOSERS') return -1;
-                return 1;
+              const prioA = getRoundPriority(a.bracket || a.type, a.round);
+              const prioB = getRoundPriority(b.bracket || b.type, b.round);
+              if (prioA !== prioB) {
+                return prioA - prioB;
               }
               return (a.round || 1) - (b.round || 1);
             })

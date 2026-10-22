@@ -577,6 +577,7 @@ export default function App() {
             onSelectUpcomingMatch={handleNavigateToMatch}
             onOpenScoreModal={handleOpenScoreModalForMatch}
             onUpdateCourt={handleUpdateCourt}
+            isReadOnly={isReadOnly}
           />
         )}
 
