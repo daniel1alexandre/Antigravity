@@ -8,23 +8,46 @@ import { getAthletePayment } from '../types/tournament';
 export default function DrawModal({ 
   isOpen, 
   onClose, 
-  teams, 
-  categories, 
+  teams = [], 
+  categories = [], 
   selectedCategoryId, 
+  setSelectedCategoryId,
   setBrackets,
   setActiveTab 
 }) {
+  const [internalCatId, setInternalCatId] = useState(() => {
+    if (selectedCategoryId && categories.some(c => c.id === selectedCategoryId)) {
+      return selectedCategoryId;
+    }
+    return categories[0]?.id || '';
+  });
+
   const [drawMode, setDrawMode] = useState('SEEDED'); // 'SEEDED' or 'RANDOM'
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawnList, setDrawnList] = useState(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [animationSteps, setAnimationSteps] = useState([]);
 
+  // Sync internalCatId whenever modal opens or selectedCategoryId changes
+  React.useEffect(() => {
+    if (isOpen) {
+      if (selectedCategoryId && categories.some(c => c.id === selectedCategoryId)) {
+        setInternalCatId(selectedCategoryId);
+      } else if (categories.length > 0) {
+        setInternalCatId(categories[0].id);
+      }
+      setDrawnList(null);
+      setIsDrawing(false);
+      setCurrentStepIndex(0);
+    }
+  }, [isOpen, selectedCategoryId, categories]);
+
   if (!isOpen) return null;
 
-  const category = categories.find(c => c.id === selectedCategoryId) || categories[0] || null;
+  const activeCategory = categories.find(c => c.id === internalCatId) || categories[0] || null;
+  const activeCatId = activeCategory?.id || '';
 
-  if (!category) {
+  if (!activeCategory) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
         <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-md p-6 text-center space-y-4">
@@ -35,14 +58,24 @@ export default function DrawModal({
     );
   }
 
-  const categoryTeams = teams.filter(t => t.categoryId === selectedCategoryId);
+  const handleSelectCategory = (catId) => {
+    setInternalCatId(catId);
+    if (setSelectedCategoryId) {
+      setSelectedCategoryId(catId);
+    }
+    setDrawnList(null);
+    setIsDrawing(false);
+    setCurrentStepIndex(0);
+  };
+
+  const categoryTeams = activeCatId ? teams.filter(t => t.categoryId === activeCatId) : [];
   const seededCount = categoryTeams.filter(t => t.isSeed).length;
 
   // Strict Rule: Only allow draw if ALL athletes in this category have status PAID_FULL (Pago) or EXEMPT (Isento)
   const unpaidAthletes = [];
   categoryTeams.forEach(team => {
-    const p1 = getAthletePayment(team, 1, category.entryFee);
-    const p2 = getAthletePayment(team, 2, category.entryFee);
+    const p1 = getAthletePayment(team, 1, activeCategory.entryFee);
+    const p2 = getAthletePayment(team, 2, activeCategory.entryFee);
 
     if (p1.status !== 'PAID_FULL' && p1.status !== 'EXEMPT') {
       unpaidAthletes.push({
@@ -107,16 +140,21 @@ export default function DrawModal({
   };
 
   const handleApplyBracket = () => {
-    if (!drawnList || drawnList.length === 0) return;
+    if (!drawnList || drawnList.length === 0 || !activeCategory) return;
 
     try {
-      const newBracket = generateDoubleEliminationBracket(drawnList, category);
+      const newBracket = generateDoubleEliminationBracket(drawnList, activeCategory);
       setBrackets(prev => ({
         ...prev,
-        [selectedCategoryId]: newBracket,
+        [activeCatId]: newBracket,
       }));
+      if (setSelectedCategoryId) {
+        setSelectedCategoryId(activeCatId);
+      }
       onClose();
-      setActiveTab('bracket');
+      if (setActiveTab) {
+        setActiveTab('bracket');
+      }
     } catch (err) {
       alert('Erro ao gerar chave: ' + err.message);
     }
@@ -130,27 +168,64 @@ export default function DrawModal({
         <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Modal Header */}
-        <div className="flex items-start justify-between relative z-10 border-b border-slate-800 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                <Shuffle className="w-5 h-5" />
+        <div className="flex flex-col gap-3 relative z-10 border-b border-slate-800 pb-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Shuffle className="w-5 h-5" />
+                </div>
+                <h3 className="text-xl sm:text-2xl font-bold font-display text-white">
+                  Sorteio dos Confrontos
+                </h3>
               </div>
-              <h3 className="text-xl sm:text-2xl font-bold font-display text-white">
-                Sorteio dos Confrontos
-              </h3>
+              <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                Categoria ativa: <strong className="text-amber-400">{activeCategory?.name}</strong> • {categoryTeams.length} duplas cadastradas
+              </p>
             </div>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1">
-              Categoria: <strong className="text-amber-400">{category?.name}</strong> • {categoryTeams.length} duplas cadastradas
-            </p>
+
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 text-sm cursor-pointer"
+            >
+              ✕
+            </button>
           </div>
 
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 text-sm"
-          >
-            ✕
-          </button>
+          {/* Category Tabs inside Modal */}
+          {categories && categories.length > 1 && !isDrawing && !drawnList && (
+            <div className="pt-1">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                Escolha a categoria a ser sorteada:
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {categories.map(c => {
+                  const isSel = c.id === activeCatId;
+                  const cTeamsCount = teams.filter(t => t.categoryId === c.id).length;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => handleSelectCategory(c.id)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        isSel
+                          ? 'bg-amber-500 text-slate-950 shadow-glow-amber'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: c.color || '#F59E0B' }} />
+                      <span>{c.name}</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono ${
+                        isSel ? 'bg-slate-950/20 text-slate-950 font-bold' : 'bg-slate-900 text-slate-400'
+                      }`}>
+                        {cTeamsCount}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Mode Selector */}

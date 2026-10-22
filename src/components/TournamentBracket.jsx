@@ -67,32 +67,8 @@ export default function TournamentBracket({
     );
   }
 
-  if (!bracket || !bracket.matches) {
-    return (
-      <div className="glass-panel p-12 rounded-3xl text-center space-y-4 max-w-xl mx-auto my-8">
-        <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto">
-          <GitBranch className="w-8 h-8" />
-        </div>
-        <h3 className="text-2xl font-bold font-display text-white">
-          Chave de Eliminatória Dupla não gerada
-        </h3>
-        <p className="text-xs sm:text-sm text-slate-400">
-          A chave da categoria <strong className="text-amber-400">{category?.name}</strong> ainda não foi sorteada. Clique no botão abaixo para realizar o sorteio oficial dos confrontos.
-        </p>
-        <button
-          onClick={onOpenDrawModal}
-          disabled={isReadOnly}
-          title={isReadOnly ? 'Apenas visualização: faça login para realizar o sorteio' : 'Realizar Sorteio'}
-          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-glow-amber transition-all transform hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
-        >
-          <Shuffle className="w-4 h-4" />
-          Realizar Sorteio da Chave
-        </button>
-      </div>
-    );
-  }
-
-  const { matches, winnersRounds, losersRounds, grandFinal } = bracket;
+  const hasValidBracket = Boolean(bracket && bracket.matches && Object.keys(bracket.matches).length > 0);
+  const { matches = {}, winnersRounds = [], losersRounds = [], grandFinal = [] } = bracket || {};
 
   // Collect all courts currently in use in active matches across all categories
   const occupiedCourtsMap = {};
@@ -450,92 +426,141 @@ export default function TournamentBracket({
           {/* Category Selector */}
           {categories && categories.length > 0 && setSelectedCategoryId && (
             <div className="flex flex-wrap gap-2 mt-3">
-              {categories.map(c => (
-                <button
-                  key={c.id}
-                  onClick={() => setSelectedCategoryId(c.id)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                    selectedCategoryId === c.id
-                      ? 'bg-amber-500 text-slate-950 shadow-glow-amber'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  {c.name}
-                </button>
-              ))}
+              {categories.map(c => {
+                const isSelected = (selectedCategoryId || category?.id) === c.id;
+                const hasDrawn = Boolean(allBrackets?.[c.id]?.matches && Object.keys(allBrackets[c.id].matches).length > 0);
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => setSelectedCategoryId(c.id)}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-amber-500 text-slate-950 shadow-glow-amber'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.color || '#F59E0B' }} />
+                    <span>{c.name}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${
+                      isSelected ? 'bg-slate-950/20 text-slate-900 font-bold' : hasDrawn ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-700/60 text-slate-400'
+                    }`}>
+                      {hasDrawn ? '✓ Gerada' : 'Pendente'}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
 
           <p className="text-xs text-slate-400 mt-2">
-            Cada dupla tem direito a uma repescagem. São necessárias 2 derrotas para a eliminação total.
+            Categoria selecionada: <strong className="text-amber-400">{category?.name}</strong> • Cada dupla tem direito a uma repescagem (2 derrotas para eliminação).
           </p>
         </div>
 
-        {/* View Switchers */}
-        <div className="flex items-center gap-1.5 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
-          <button
-            onClick={() => setActiveBracketView('ALL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              activeBracketView === 'ALL' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Visão Geral
-          </button>
-          <button
-            onClick={() => setActiveBracketView('WINNERS')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              activeBracketView === 'WINNERS' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Vencedores
-          </button>
-          <button
-            onClick={() => setActiveBracketView('LOSERS')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              activeBracketView === 'LOSERS' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Repescagem
-          </button>
-          <button
-            onClick={() => setActiveBracketView('FINAL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              activeBracketView === 'FINAL' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Grande Final
-          </button>
-        </div>
+        {hasValidBracket ? (
+          <div className="flex flex-wrap items-center gap-3 self-end md:self-center">
+            {/* View Switchers */}
+            <div className="flex items-center gap-1.5 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+              <button
+                onClick={() => setActiveBracketView('ALL')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  activeBracketView === 'ALL' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Visão Geral
+              </button>
+              <button
+                onClick={() => setActiveBracketView('WINNERS')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  activeBracketView === 'WINNERS' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Vencedores
+              </button>
+              <button
+                onClick={() => setActiveBracketView('LOSERS')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  activeBracketView === 'LOSERS' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Repescagem
+              </button>
+              <button
+                onClick={() => setActiveBracketView('FINAL')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  activeBracketView === 'FINAL' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Grande Final
+              </button>
+            </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => window.print()}
-            title="Imprimir Súmula e Tabela"
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
-          >
-            <Printer className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onOpenLiveArena}
-            title="Abrir Modo Telão da Arena"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md transition-all"
-          >
-            <Tv className="w-4 h-4" /> Telão
-          </button>
-          <button
-            onClick={onResetBracket}
-            disabled={isReadOnly}
-            title={isReadOnly ? 'Apenas visualização: faça login para cancelar o sorteio' : `Cancelar sorteio da categoria ${category?.name || ''}`}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-950/70 hover:bg-rose-900/90 text-rose-300 hover:text-rose-200 border border-rose-800/80 text-xs font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
-          >
-            <XCircle className="w-4 h-4 text-rose-400" />
-            <span>Cancelar Sorteio</span>
-          </button>
-        </div>
+            {/* Actions */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => window.print()}
+                title="Imprimir Súmula e Tabela"
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
+              >
+                <Printer className="w-4 h-4" />
+              </button>
+              <button
+                onClick={onOpenLiveArena}
+                title="Abrir Modo Telão da Arena"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+              >
+                <Tv className="w-4 h-4" /> Telão
+              </button>
+              <button
+                onClick={() => onResetBracket && onResetBracket(category?.id)}
+                disabled={isReadOnly}
+                title={isReadOnly ? 'Apenas visualização: faça login para cancelar o sorteio' : `Cancelar sorteio da categoria ${category?.name || ''}`}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-950/70 hover:bg-rose-900/90 text-rose-300 hover:text-rose-200 border border-rose-800/80 text-xs font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm cursor-pointer"
+              >
+                <XCircle className="w-4 h-4 text-rose-400" />
+                <span>Cancelar Sorteio</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onOpenDrawModal && onOpenDrawModal(category?.id)}
+              disabled={isReadOnly}
+              title={isReadOnly ? 'Apenas visualização: faça login para realizar o sorteio' : 'Realizar Sorteio'}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-glow-amber transition-all transform hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none cursor-pointer"
+            >
+              <Shuffle className="w-4 h-4" />
+              <span>Sortear Chave</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* 1. WINNERS BRACKET (CHAVE DOS VENCEDORES) */}
+      {!hasValidBracket ? (
+        <div className="glass-panel p-12 rounded-3xl text-center space-y-4 max-w-xl mx-auto my-8 border border-slate-800 animate-in fade-in">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto">
+            <GitBranch className="w-8 h-8" />
+          </div>
+          <h3 className="text-2xl font-bold font-display text-white">
+            Chave de Eliminatória Dupla não gerada
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-400">
+            A chave da categoria <strong className="text-amber-400">{category?.name}</strong> ainda não foi sorteada. Clique no botão abaixo para realizar o sorteio oficial dos confrontos.
+          </p>
+          <button
+            onClick={() => onOpenDrawModal && onOpenDrawModal(category?.id)}
+            disabled={isReadOnly}
+            title={isReadOnly ? 'Apenas visualização: faça login para realizar o sorteio' : 'Realizar Sorteio'}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-glow-amber transition-all transform hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none cursor-pointer"
+          >
+            <Shuffle className="w-4 h-4" />
+            <span>Realizar Sorteio da Chave ({category?.name})</span>
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* 1. WINNERS BRACKET (CHAVE DOS VENCEDORES) */}
       {(activeBracketView === 'ALL' || activeBracketView === 'WINNERS') && (
         <div className="glass-panel p-6 rounded-3xl space-y-4 border border-amber-500/20">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -626,6 +651,8 @@ export default function TournamentBracket({
             {grandFinal.map((mId) => renderMatchCard(mId))}
           </div>
         </div>
+      )}
+        </>
       )}
 
     </div>

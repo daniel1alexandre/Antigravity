@@ -114,6 +114,17 @@ export default function App() {
     setDataLoaded(true);
   }, []);
 
+  // Keep selectedCategoryId in sync whenever categories change or load
+  useEffect(() => {
+    if (categories.length > 0) {
+      if (!selectedCategoryId || !categories.some(c => c.id === selectedCategoryId)) {
+        setSelectedCategoryId(categories[0].id);
+      }
+    } else if (selectedCategoryId) {
+      setSelectedCategoryId('');
+    }
+  }, [categories, selectedCategoryId]);
+
   // Save to Storage on changes for current active tournament
   useEffect(() => {
     if (!dataLoaded || !activeTournamentId) return;
@@ -277,13 +288,16 @@ export default function App() {
     );
   }
 
-  const currentCategory = categories.find(c => c.id === selectedCategoryId) || categories[0] || null;
-  const currentBracket = selectedCategoryId ? (brackets[selectedCategoryId] || null) : null;
-  const currentCategoryTeams = selectedCategoryId ? teams.filter(t => t.categoryId === selectedCategoryId) : [];
+  const activeCategoryId = (selectedCategoryId && categories.some(c => c.id === selectedCategoryId))
+    ? selectedCategoryId
+    : (categories[0]?.id || '');
+  const currentCategory = categories.find(c => c.id === activeCategoryId) || null;
+  const currentBracket = activeCategoryId ? (brackets[activeCategoryId] || null) : null;
+  const currentCategoryTeams = activeCategoryId ? teams.filter(t => t.categoryId === activeCategoryId) : [];
 
   // Update Match Score & Advance Bracket (supports match from any category)
   const handleSaveScore = (matchId, score1, score2, sets, matchCategoryId) => {
-    const targetCatId = matchCategoryId || scoreModalMatch?.categoryId || selectedCategoryId;
+    const targetCatId = matchCategoryId || scoreModalMatch?.categoryId || activeCategoryId;
     const targetBracket = brackets[targetCatId];
     if (!targetBracket) return;
 
@@ -371,16 +385,18 @@ export default function App() {
   };
 
   // Cancel category draw / Reset category bracket
-  const handleResetBracket = () => {
+  const handleResetBracket = (catIdToReset) => {
     if (isReadOnly) {
       alert('Modo apenas visualização: faça login como administrador para cancelar o sorteio.');
       return;
     }
-    if (!selectedCategoryId) return;
-    const catName = currentCategory?.name || 'selecionada';
+    const targetCatId = catIdToReset || activeCategoryId;
+    if (!targetCatId) return;
+    const catToReset = categories.find(c => c.id === targetCatId) || currentCategory;
+    const catName = catToReset?.name || 'selecionada';
     if (window.confirm(`Deseja realmente cancelar o sorteio da categoria "${catName}"? Todos os confrontos gerados serão cancelados para permitir um novo sorteio.`)) {
       const newBrackets = { ...brackets };
-      delete newBrackets[selectedCategoryId];
+      delete newBrackets[targetCatId];
       setBrackets(newBrackets);
     }
   };
@@ -488,13 +504,16 @@ export default function App() {
             allBrackets={brackets}
             category={currentCategory}
             categories={categories}
-            selectedCategoryId={selectedCategoryId}
+            selectedCategoryId={activeCategoryId}
             setSelectedCategoryId={setSelectedCategoryId}
             courts={eventInfo?.courts}
             targetMatchId={targetMatchId}
             onOpenScoreModal={(match) => setScoreModalMatch(match)}
             onOpenCourtScoreboard={(match) => setCourtScoreboardMatch(match)}
-            onOpenDrawModal={() => setIsDrawModalOpen(true)}
+            onOpenDrawModal={(catId) => {
+              if (catId) setSelectedCategoryId(catId);
+              setIsDrawModalOpen(true);
+            }}
             onResetBracket={handleResetBracket}
             onOpenLiveArena={() => setIsArenaLiveOpen(true)}
             onUpdateCourt={handleUpdateCourt}
@@ -605,7 +624,8 @@ export default function App() {
         onClose={() => setIsDrawModalOpen(false)}
         teams={teams}
         categories={categories}
-        selectedCategoryId={selectedCategoryId}
+        selectedCategoryId={activeCategoryId}
+        setSelectedCategoryId={setSelectedCategoryId}
         setBrackets={setBrackets}
         setActiveTab={setActiveTab}
       />

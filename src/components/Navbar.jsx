@@ -285,6 +285,24 @@ export default function Navbar({
               )}
             </div>
 
+            {/* Category Selector Dropdown */}
+            {categories && categories.length > 0 && setSelectedCategoryId && (
+              <div className="relative">
+                <select
+                  value={selectedCategoryId || categories[0]?.id || ''}
+                  onChange={(e) => setSelectedCategoryId(e.target.value)}
+                  title="Categoria Selecionada"
+                  className="h-9 sm:h-10 bg-slate-900/90 border border-slate-700/80 hover:border-amber-500/40 text-amber-300 text-xs font-bold rounded-xl px-2.5 sm:px-3 focus:outline-none focus:border-amber-500 cursor-pointer max-w-[130px] sm:max-w-[180px] md:max-w-[220px] truncate"
+                >
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id} className="bg-slate-900 text-white font-semibold">
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
           </div>
 
           {/* Right: Quick Action Buttons & User Session */}
