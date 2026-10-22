@@ -107,6 +107,11 @@ export default function ArenaLiveDisplay({
     }
   });
 
+  const availableCourts = courts.filter(court => {
+    const cName = court.name;
+    return !allLiveBracketMatches.some(m => m.court === cName && m.status !== 'COMPLETED');
+  });
+
   // Build the day-aware scheduled match list
   // Merging schedule order, scheduled times, rounds, and live bracket states
   const scheduledList = (scheduleData.scheduledMatches || []).map(sm => {
@@ -549,10 +554,30 @@ export default function ArenaLiveDisplay({
                       </div>
                     </div>
 
-                    <div className="pt-0.5 flex items-center justify-center">
+                    <div className="pt-0.5 flex items-center justify-between gap-1 flex-wrap">
                       <span className="text-[10px] font-bold text-slate-950 bg-amber-400 group-hover/court:bg-amber-300 px-3 py-1 rounded-xl shadow-md flex items-center gap-1.5 transition-colors">
-                        <Edit3 className="w-3 h-3" /> Lançar Súmula & Placar
+                        <Edit3 className="w-3 h-3" /> Lançar Placar
                       </span>
+
+                      {!isReadOnly && availableCourts.length > 0 && onUpdateCourt && (
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <span className="text-[9px] text-slate-400 font-bold uppercase">Mover:</span>
+                          {availableCourts.map(c => {
+                            const shortName = c.name.replace(/Quadra\s*/i, 'Q');
+                            return (
+                              <button
+                                key={c.id || c.name}
+                                type="button"
+                                onClick={() => onUpdateCourt(courtMatch.id, c.name, courtMatch.categoryId)}
+                                title={`Mover este jogo para a ${c.name}`}
+                                className="px-1.5 py-0.5 rounded-lg bg-slate-800 hover:bg-amber-500 text-slate-300 hover:text-slate-950 border border-slate-700 hover:border-amber-400 text-[9px] font-black transition-colors cursor-pointer"
+                              >
+                                {shortName}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -789,15 +814,51 @@ export default function ArenaLiveDisplay({
                   </div>
 
                   {/* Bottom Line: Action / Assignment CTA */}
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-800/60">
-                    <span>{m.dayName || 'Dia 1'}</span>
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1.5 border-t border-slate-800/60 gap-1 flex-wrap">
+                    <span className="text-slate-500">{m.dayName || 'Dia 1'}</span>
+                    
                     {m.isReady && !isReadOnly ? (
-                      <span className={`font-bold flex items-center gap-1 cursor-pointer transition-colors ${
-                        isSelected ? 'text-amber-300 font-black' : 'text-amber-400 hover:text-white'
-                      }`}>
-                        <GripVertical className="w-3 h-3" />
-                        {isSelected ? 'Clique na quadra livre' : 'Arraste ou aloque'}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {availableCourts.length > 0 && (
+                          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            <span className="text-[9px] text-slate-400 font-bold uppercase">Quadra:</span>
+                            {availableCourts.map(c => {
+                              const shortName = c.name.replace(/Quadra\s*/i, 'Q');
+                              return (
+                                <button
+                                  key={c.id || c.name}
+                                  type="button"
+                                  onClick={() => {
+                                    if (onUpdateCourt) {
+                                      onUpdateCourt(m.id, c.name, m.categoryId);
+                                      setSelectedWaitingMatch(null);
+                                    }
+                                  }}
+                                  title={`Alocar agora na ${c.name}`}
+                                  className="px-2 py-0.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-400 text-emerald-300 hover:text-slate-950 border border-emerald-500/40 text-[10px] font-black transition-all cursor-pointer shadow-sm active:scale-95"
+                                >
+                                  +{shortName}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <span 
+                          onClick={() => {
+                            if (selectedWaitingMatch?.id === m.id) {
+                              setSelectedWaitingMatch(null);
+                            } else {
+                              setSelectedWaitingMatch(m);
+                            }
+                          }}
+                          className={`font-bold flex items-center gap-1 cursor-pointer transition-colors px-1.5 py-0.5 rounded-md ${
+                            isSelected ? 'bg-amber-400 text-slate-950 font-black shadow-sm' : 'text-amber-400 hover:text-amber-300'
+                          }`}
+                        >
+                          <GripVertical className="w-3 h-3" />
+                          {isSelected ? 'Quadra selecionada' : 'Mover / Arrastar'}
+                        </span>
+                      </div>
                     ) : m.isLive ? (
                       <span className="text-emerald-400 font-bold flex items-center gap-1">
                         <Edit3 className="w-3 h-3" /> Lançar Placar
