@@ -276,6 +276,33 @@ export function generateDoubleEliminationBracket(teams, category) {
   matches[losersFinalMatchId].nextWinnerMatchId = gfMatchId;
   matches[losersFinalMatchId].nextWinnerSlot = 'team2';
 
+  // Map and attach exact origin/source labels for every match slot
+  for (const matchId in matches) {
+    const m = matches[matchId];
+    if (m.nextWinnerMatchId && matches[m.nextWinnerMatchId]) {
+      const target = matches[m.nextWinnerMatchId];
+      const slot = m.nextWinnerSlot;
+      target[`${slot}Source`] = {
+        type: 'WINNER',
+        sourceMatchId: m.id,
+        sourceMatchNumber: m.matchNumber,
+        label: `Venc. Jogo #${m.matchNumber}`,
+      };
+      target[`${slot}SourceLabel`] = `Venc. Jogo #${m.matchNumber}`;
+    }
+    if (m.nextLoserMatchId && matches[m.nextLoserMatchId]) {
+      const target = matches[m.nextLoserMatchId];
+      const slot = m.nextLoserSlot;
+      target[`${slot}Source`] = {
+        type: 'LOSER',
+        sourceMatchId: m.id,
+        sourceMatchNumber: m.matchNumber,
+        label: `Perd. Jogo #${m.matchNumber}`,
+      };
+      target[`${slot}SourceLabel`] = `Perd. Jogo #${m.matchNumber}`;
+    }
+  }
+
   // Return full tournament state
   const state = {
     categoryId: category.id,
@@ -450,4 +477,53 @@ export function calculateStandings(state) {
   }
 
   return standings;
+}
+
+/**
+ * Retorna o rótulo de procedência da vaga (ex: "Venc. Jogo #1", "Perd. Jogo #4")
+ * sempre que o adversário ainda não estiver definido.
+ * Suporta tanto matches recém-gerados quanto dados legados já salvos.
+ */
+export function getMatchSlotSourceLabel(match, slot = 'team1', allMatches = {}) {
+  if (!match) return 'A definir';
+
+  // 1. Label previamente gravado no objeto do confronto
+  if (slot === 'team1' && match.team1SourceLabel) return match.team1SourceLabel;
+  if (slot === 'team2' && match.team2SourceLabel) return match.team2SourceLabel;
+  if (slot === 'team1' && match.team1Source?.label) return match.team1Source.label;
+  if (slot === 'team2' && match.team2Source?.label) return match.team2Source.label;
+
+  // 2. Busca dinâmica nos confrontos passados caso não tenha o campo gravado
+  if (allMatches && typeof allMatches === 'object') {
+    for (const srcId of Object.keys(allMatches)) {
+      const src = allMatches[srcId];
+      if (src.nextWinnerMatchId === match.id && src.nextWinnerSlot === slot) {
+        return `Venc. Jogo #${src.matchNumber}`;
+      }
+      if (src.nextLoserMatchId === match.id && src.nextLoserSlot === slot) {
+        return `Perd. Jogo #${src.matchNumber}`;
+      }
+    }
+  }
+
+  // 3. Casos especiais por tipo de confronto
+  if (match.type === 'GRAND_FINAL' || match.bracket === 'GRAND_FINAL') {
+    return slot === 'team1' ? 'Venc. Final Vencedores' : 'Venc. Final Repescagem';
+  }
+
+  return 'A definir';
+}
+
+/**
+ * Retorna o texto a ser exibido para a dupla:
+ * Se a dupla já estiver definida: nome da dupla (ou Folga se for BYE).
+ * Se a dupla ainda NÃO estiver definida: de qual jogo ela virá (ex: "Venc. Jogo #1").
+ */
+export function getTeamSlotDisplay(match, slot = 'team1', allMatches = {}) {
+  const team = slot === 'team1' ? match?.team1 : match?.team2;
+  if (team) {
+    if (team.isBye) return 'Folga (Sem adversário)';
+    return team.displayName || team.name || 'Dupla';
+  }
+  return getMatchSlotSourceLabel(match, slot, allMatches);
 }

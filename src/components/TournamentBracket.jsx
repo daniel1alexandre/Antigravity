@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getMatchSlotSourceLabel } from '../utils/doubleEliminationEngine';
 import { 
   GitBranch, 
   Trophy, 
@@ -241,9 +242,9 @@ export default function TournamentBracket({
                   ? 'font-black text-white'
                   : t1
                   ? 'font-semibold text-slate-200'
-                  : 'italic text-slate-500'
+                  : 'font-medium italic text-amber-400/90'
               }`}>
-                {t1 ? (t1IsBye ? 'Folga (Sem adversário)' : t1.displayName) : 'A definir'}
+                {t1 ? (t1IsBye ? 'Folga (Sem adversário)' : t1.displayName) : getMatchSlotSourceLabel(match, 'team1', bracket?.matches)}
               </span>
               {t1?.isSeed && (
                 <span className="text-[10px] text-amber-400 font-bold">#{t1.seedRank}</span>
@@ -300,9 +301,9 @@ export default function TournamentBracket({
                   ? 'font-black text-white'
                   : t2
                   ? 'font-semibold text-slate-200'
-                  : 'italic text-slate-500'
+                  : 'font-medium italic text-amber-400/90'
               }`}>
-                {t2 ? (t2IsBye ? 'Folga (Sem adversário)' : t2.displayName) : 'A definir'}
+                {t2 ? (t2IsBye ? 'Folga (Sem adversário)' : t2.displayName) : getMatchSlotSourceLabel(match, 'team2', bracket?.matches)}
               </span>
               {t2?.isSeed && (
                 <span className="text-[10px] text-amber-400 font-bold">#{t2.seedRank}</span>

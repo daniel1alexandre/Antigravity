@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Navbar from './components/Navbar';
+import Sidebar from './components/Sidebar';
 import CategoryManager from './components/CategoryManager';
 import TeamsManager from './components/TeamsManager';
 import PaymentControl from './components/PaymentControl';
@@ -28,13 +28,21 @@ import {
 } from './utils/storage';
 import { updateMatchScore } from './utils/doubleEliminationEngine';
 import { getCurrentUser, logout } from './utils/auth';
-import { Eye, Lock } from 'lucide-react';
+import { Eye, Lock, Menu, Trophy, Layers } from 'lucide-react';
 
 export default function App() {
   // Authentication & Session
   const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
   const [isUserManagerOpen, setIsUserManagerOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   // publicView: null = not set yet, false = logged in panel, true = public view
   const [publicView, setPublicView] = useState(null);
   const isReadOnly = !currentUser;
@@ -402,10 +410,10 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col justify-between">
+    <div className="flex h-screen overflow-hidden bg-[#0B0F17] text-slate-100">
       
-      {/* Top Navbar Navigation */}
-      <Navbar
+      {/* Menu Lateral (Sidebar) com todos os menus e botões de configurações */}
+      <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         categories={categories}
@@ -431,15 +439,67 @@ export default function App() {
         onLogout={() => {
           logout();
           setCurrentUser(null);
-          setPublicView(null); // Retorna à tela de login
+          setPublicView(null);
         }}
         teamsCount={currentCategoryTeams.length}
         hasBracket={Boolean(currentBracket)}
         isReadOnly={isReadOnly}
+        isOpen={isMobileSidebarOpen}
+        onToggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+        isMobile={isMobile}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
       {/* Main App Content Viewport */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
+        
+        {/* Top Header Bar */}
+        <header className="sticky top-0 z-30 bg-[#0d121c]/95 backdrop-blur-md border-b border-slate-800/80 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3 shadow-md flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Mobile menu hamburger button */}
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="md:hidden p-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-amber-400 focus:outline-none"
+              title="Abrir Menu Lateral"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 truncate">
+              <span className="font-display font-black text-white text-sm sm:text-base tracking-tight truncate flex items-center gap-1.5">
+                <Trophy className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <span className="truncate">{eventInfo?.name || 'Torneio'}</span>
+              </span>
+              {currentCategory && (
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 flex-shrink-0">
+                  <Layers className="w-3 h-3 text-purple-400" />
+                  <span>{currentCategory.name}</span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {isReadOnly ? (
+              <button
+                onClick={() => setIsLoginModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition-all shadow-glow-amber"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Fazer Login</span>
+                <span className="sm:hidden">Entrar</span>
+              </button>
+            ) : (
+              <div className="hidden sm:flex items-center gap-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-xl">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Painel Conectado</span>
+              </div>
+            )}
+          </div>
+        </header>
+
+        {/* Main Content Area */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1">
         
         {/* Read-Only Notice Banner for Unauthenticated Visitors */}
         {isReadOnly && (
@@ -594,6 +654,8 @@ export default function App() {
           </p>
         </div>
       </footer>
+
+      </div>
 
       {/* ============================================================ */}
       {/* GLOBAL MODALS */}

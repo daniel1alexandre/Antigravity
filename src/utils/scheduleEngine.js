@@ -3,6 +3,7 @@
  * Multi-day scheduling, chronological slot calculation, and round progression ordering.
  */
 import { DEFAULT_COURTS } from '../types/tournament';
+import { getMatchSlotSourceLabel } from './doubleEliminationEngine';
 
 export function timeToMinutes(t) {
   if (!t || typeof t !== 'string') return 480; // default 08:00
@@ -315,8 +316,8 @@ export function computeOfficialTournamentSchedule({
             return (a.matchNumber || 0) - (b.matchNumber || 0);
           })
           .forEach(m => {
-            const t1 = m.team1?.displayName || (m.team1?.isBye ? 'Folga' : 'A definir');
-            const t2 = m.team2?.displayName || (m.team2?.isBye ? 'Folga' : 'A definir');
+            const t1 = m.team1?.displayName || (m.team1?.isBye ? 'Folga' : getMatchSlotSourceLabel(m, 'team1', bracket.matches));
+            const t2 = m.team2?.displayName || (m.team2?.isBye ? 'Folga' : getMatchSlotSourceLabel(m, 'team2', bracket.matches));
             const bType = m.bracket || m.type;
             const roundName = bType === 'GRAND_FINAL'
               ? 'Grande Final'

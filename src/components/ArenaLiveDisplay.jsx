@@ -24,6 +24,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { DEFAULT_COURTS } from '../types/tournament';
+import { getMatchSlotSourceLabel } from '../utils/doubleEliminationEngine';
 import { 
   computeOfficialTournamentSchedule, 
   formatDatePt, 
@@ -186,8 +187,8 @@ export default function ArenaLiveDisplay({
       roundPriority,
       team1,
       team2,
-      team1Name: team1?.displayName || (t1IsBye ? 'Folga' : 'A definir'),
-      team2Name: team2?.displayName || (t2IsBye ? 'Folga' : 'A definir'),
+      team1Name: team1?.displayName || (t1IsBye ? 'Folga' : getMatchSlotSourceLabel(liveMatch || sm, 'team1', brackets[sm.categoryId]?.matches)),
+      team2Name: team2?.displayName || (t2IsBye ? 'Folga' : getMatchSlotSourceLabel(liveMatch || sm, 'team2', brackets[sm.categoryId]?.matches)),
       court: activeCourt,
       activeCourt,
       scheduledCourt,

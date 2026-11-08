@@ -25,6 +25,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { getRoundPriority } from '../utils/scheduleEngine';
+import { getMatchSlotSourceLabel } from '../utils/doubleEliminationEngine';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 function timeToMinutes(t) {
@@ -1061,8 +1062,8 @@ export default function ScheduleManager({
               return (a.round || 1) - (b.round || 1);
             })
             .forEach(m => {
-              const t1 = m.team1?.displayName || (m.team1?.isBye ? 'Folga' : 'A definir');
-              const t2 = m.team2?.displayName || (m.team2?.isBye ? 'Folga' : 'A definir');
+              const t1 = m.team1?.displayName || (m.team1?.isBye ? 'Folga' : getMatchSlotSourceLabel(m, 'team1', bracket.matches));
+              const t2 = m.team2?.displayName || (m.team2?.isBye ? 'Folga' : getMatchSlotSourceLabel(m, 'team2', bracket.matches));
               const bType = m.bracket || m.type;
               const roundName = bType === 'GRAND_FINAL'
                 ? 'Grande Final'
