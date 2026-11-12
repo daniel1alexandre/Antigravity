@@ -40,7 +40,8 @@ export default function TournamentBracket({
   onResetBracket,
   onOpenLiveArena,
   onUpdateCourt,
-  isReadOnly = false
+  isReadOnly = false,
+  activeTournamentId = ''
 }) {
   const [activeBracketView, setActiveBracketView] = useState('ALL'); // 'ALL', 'WINNERS', 'LOSERS', 'FINAL'
   const [copiedShare, setCopiedShare] = useState(false);
@@ -50,7 +51,9 @@ export default function TournamentBracket({
     const origin = window.location.origin;
     const path = window.location.pathname;
     const catId = selectedCategoryId || category?.id || '';
-    const shareUrl = `${origin}${path}?view=public&tab=bracket${catId ? `&category=${catId}` : ''}`;
+    const tournParam = activeTournamentId ? `&tournament=${encodeURIComponent(activeTournamentId)}` : '';
+    const catParam = catId ? `&category=${encodeURIComponent(catId)}` : '';
+    const shareUrl = `${origin}${path}?view=public&tab=bracket${tournParam}${catParam}`;
 
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -425,20 +428,23 @@ export default function TournamentBracket({
           </div>
         ) : (
           <div className="mt-3.5 pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-2">
-            {/* Court selector with occupied status */}
+            {/* Court selector with occupied status (desabilitado se finalizado) */}
             <select
               value={match.court || ''}
+              disabled={isCompleted || isReadOnly}
               onChange={(e) => onUpdateCourt(match.id, e.target.value)}
               className={`text-xs font-bold rounded-xl px-3 py-2 border transition-all focus:outline-none flex-1 truncate min-w-[130px] ${
-                hasCourtAssigned
+                isCompleted
+                  ? 'bg-slate-950/60 border-slate-800 text-slate-500 cursor-not-allowed opacity-75'
+                  : hasCourtAssigned
                   ? 'bg-emerald-950 border-emerald-400 text-emerald-300 ring-1 ring-emerald-500/40 shadow-sm'
                   : isUpcomingSequence
                   ? 'bg-amber-950/80 border-amber-500/70 text-amber-300 focus:border-amber-400'
                   : 'bg-slate-950 border-slate-700/80 text-slate-300 focus:border-amber-500'
               }`}
             >
-              <option value="">{hasCourtAssigned ? 'Liberar Quadra' : '+ Chamar Quadra'}</option>
-              {(courts || []).map(c => {
+              <option value="">{isCompleted ? (match.court ? `Quadra: ${match.court}` : 'Sem quadra') : hasCourtAssigned ? 'Liberar Quadra' : '+ Chamar Quadra'}</option>
+              {!isCompleted && (courts || []).map(c => {
                 const courtName = c.name;
                 const occupiedInfo = occupiedCourtsMap[courtName];
                 const isOccupiedByAnother = occupiedInfo && occupiedInfo.matchId !== match.id;
@@ -455,25 +461,26 @@ export default function TournamentBracket({
               })}
             </select>
 
-            {/* Action buttons */}
+            {/* Action buttons: Botão de Placar removido; Súmula mantida para lançamento ou alteração */}
             {t1 && t2 && (
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 <button
-                  onClick={() => onOpenCourtScoreboard(match)}
-                  title="Placar Digital para Celular do Árbitro / TV"
-                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-amber-400 border border-slate-700/90 text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
-                >
-                  <Maximize2 className="w-3.5 h-3.5" />
-                  <span>Placar</span>
-                </button>
-
-                <button
                   onClick={() => !isReadOnly && onOpenScoreModal(match)}
                   disabled={isReadOnly}
-                  title={isReadOnly ? 'Apenas visualização: faça login para lançar súmula' : 'Lançar Súmula Rápida'}
-                  className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 text-xs font-black shadow-glow-amber transition-all flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={
+                    isReadOnly 
+                      ? 'Apenas visualização: faça login para lançar ou alterar súmula' 
+                      : isCompleted 
+                      ? 'Alterar Resultado da Súmula deste jogo' 
+                      : 'Lançar Súmula Rápida'
+                  }
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1 cursor-pointer active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+                    isCompleted
+                      ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 shadow-sm'
+                      : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-glow-amber'
+                  }`}
                 >
-                  <span>Súmula</span>
+                  <span>{isCompleted ? 'Alterar Súmula' : 'Súmula'}</span>
                 </button>
               </div>
             )}

@@ -160,7 +160,7 @@ function PublicTeamsTab({ teams, categories, onOpenRegister }) {
 }
 
 // ─── Chaveamento (View Only) ────────────────────────────────────────────────
-function PublicBracketTab({ categories, teams, brackets, eventInfo, selectedCategoryId, setSelectedCategoryId }) {
+function PublicBracketTab({ categories, teams, brackets, eventInfo, selectedCategoryId, setSelectedCategoryId, activeTournamentId }) {
   const activeCatId = (selectedCategoryId && categories.some(c => c.id === selectedCategoryId))
     ? selectedCategoryId
     : (categories[0]?.id || '');
@@ -232,6 +232,7 @@ function PublicBracketTab({ categories, teams, brackets, eventInfo, selectedCate
           onOpenLiveArena={() => {}}
           onUpdateCourt={() => {}}
           isReadOnly={true}
+          activeTournamentId={activeTournamentId}
         />
       )}
     </div>
@@ -309,6 +310,81 @@ export default function PublicViewScreen({
     setRegisterDefaultCatId(catId || selectedCategoryId || categories[0]?.id || '');
     setIsRegisterModalOpen(true);
   };
+
+  // Verifica se o torneio está encerrado (bloqueando visualização para usuários externos)
+  const currentTourn = tournaments.find(t => t.id === activeTournamentId) || {};
+  const isTournamentClosed = Boolean(
+    currentTourn.status === 'COMPLETED' || 
+    currentTourn.isCompleted || 
+    eventInfo?.status === 'COMPLETED' ||
+    eventInfo?.isCompleted
+  );
+
+  if (isTournamentClosed) {
+    return (
+      <div className="min-h-screen bg-[#070B12] text-white flex flex-col justify-between select-none relative overflow-hidden">
+        <div className="fixed top-0 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="fixed bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <header className="sticky top-0 z-40 bg-[#070B12]/95 backdrop-blur-md border-b border-slate-800/80 shadow-xl px-4 sm:px-6 py-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {onGoToLogin && (
+                <button
+                  onClick={onGoToLogin}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95"
+                >
+                  <ArrowLeft className="w-4 h-4 text-amber-400" />
+                  <span>Voltar</span>
+                </button>
+              )}
+              <div className="w-10 h-10 rounded-xl overflow-hidden border border-amber-500/40 bg-slate-900 shadow-md">
+                <img src="/db-logo.jpg" alt="DB Logo" className="w-full h-full object-cover" />
+              </div>
+              <div>
+                <span className="font-black text-base text-white font-display">DB Futvôlei Pro</span>
+                <p className="text-xs text-slate-400">{eventInfo?.name || 'Torneio'}</p>
+              </div>
+            </div>
+            <span className="px-3 py-1 rounded-full text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/30 tracking-wider">
+              TORNEIO ENCERRADO
+            </span>
+          </div>
+        </header>
+
+        <main className="flex-1 flex items-center justify-center p-6 z-10">
+          <div className="max-w-md w-full glass-panel p-8 sm:p-10 rounded-3xl border border-slate-800/90 text-center space-y-5 shadow-2xl animate-in zoom-in-95">
+            <div className="w-20 h-20 rounded-3xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-glow-amber">
+              <Lock className="w-10 h-10" />
+            </div>
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-black font-display text-white">
+                Torneio Encerrado
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-400 mt-2.5 leading-relaxed">
+                As disputas e o último resultado deste torneio já foram finalizados com sucesso.
+                A visualização das chaves e dados completos do torneio encerrado está disponível exclusivamente para a administração.
+              </p>
+            </div>
+            <div className="pt-3">
+              {onGoToLogin && (
+                <button
+                  onClick={onGoToLogin}
+                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-glow-amber transition-all cursor-pointer active:scale-95"
+                >
+                  Fazer Login como Administrador
+                </button>
+              )}
+            </div>
+          </div>
+        </main>
+
+        <footer className="py-4 text-center text-xs text-slate-600 border-t border-slate-800/40">
+          DB Futvôlei Pro Arena • Plataforma Oficial
+        </footer>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#070B12] text-white flex flex-col">
@@ -476,6 +552,7 @@ export default function PublicViewScreen({
             eventInfo={eventInfo}
             selectedCategoryId={selectedCategoryId}
             setSelectedCategoryId={setSelectedCategoryId}
+            activeTournamentId={activeTournamentId}
           />
         )}
         {activeTab === 'schedule' && (

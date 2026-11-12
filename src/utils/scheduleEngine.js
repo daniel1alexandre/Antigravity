@@ -78,9 +78,17 @@ export function buildDaySchedule({
     return tA - tB;
   });
 
+  // Track when each category round finishes, and when each team is free
+  const categoryRoundEndTimes = {};
+  const teamBusyUntil = {};
+
   sortedCategoryEntries.forEach(({ category: cat, matchesList }) => {
     const desiredCatStartTime = dayInfo.categoryStartTimes?.[cat.id] || dayInfo.startTime || startTime || '08:00';
     const desiredCatStartMins = timeToMinutes(desiredCatStartTime);
+
+    if (!categoryRoundEndTimes[cat.id]) {
+      categoryRoundEndTimes[cat.id] = {};
+    }
 
     const cc = categoryCourtsConfig[cat.id];
     let allowed = (!cc || cc === 'ALL')
@@ -91,13 +99,27 @@ export function buildDaySchedule({
     const catMatches = [];
 
     matchesList.forEach(item => {
-      // Find the allowed court that is ready earliest (considering the category start time)
+      // 1. Dependência de rodada: se for rodada > 1 na mesma chave, não inicia antes da rodada anterior
+      const roundNum = Number(item.round) || 1;
+      const prevRoundKey = `${item.bracket || 'W'}-R${roundNum - 1}`;
+      const prevRoundEnd = categoryRoundEndTimes[cat.id][prevRoundKey] || 0;
+
+      // 2. Disponibilidade das duplas: nenhuma dupla joga em duas quadras simultaneamente
+      const t1Id = item.team1?.id || item.team1Name;
+      const t2Id = item.team2?.id || item.team2Name;
+      const t1Ready = t1Id && !String(t1Id).startsWith('BYE') ? (teamBusyUntil[t1Id] || 0) : 0;
+      const t2Ready = t2Id && !String(t2Id).startsWith('BYE') ? (teamBusyUntil[t2Id] || 0) : 0;
+      const teamsEarliestReady = Math.max(t1Ready, t2Ready);
+
+      const minEligibleStart = Math.max(desiredCatStartMins, prevRoundEnd, teamsEarliestReady);
+
+      // Find the allowed court that is ready earliest
       let bestCourt = allowed[0];
-      let bestReadyTime = Math.max(free[bestCourt], desiredCatStartMins);
+      let bestReadyTime = Math.max(free[bestCourt], minEligibleStart);
 
       for (let i = 1; i < allowed.length; i++) {
         const c = allowed[i];
-        const readyTime = Math.max(free[c], desiredCatStartMins);
+        const readyTime = Math.max(free[c], minEligibleStart);
         if (readyTime < bestReadyTime) {
           bestReadyTime = readyTime;
           bestCourt = c;
@@ -129,6 +151,12 @@ export function buildDaySchedule({
       catMatches.push(matchObj);
       all.push(matchObj);
       free[bestCourt] = s + slot;
+
+      // Registra término da rodada e bloqueio das duplas
+      const currentRoundKey = `${item.bracket || 'W'}-R${roundNum}`;
+      categoryRoundEndTimes[cat.id][currentRoundKey] = Math.max(categoryRoundEndTimes[cat.id][currentRoundKey] || 0, s + slot);
+      if (t1Id && !String(t1Id).startsWith('BYE')) teamBusyUntil[t1Id] = s + slot;
+      if (t2Id && !String(t2Id).startsWith('BYE')) teamBusyUntil[t2Id] = s + slot;
     });
 
     const catActualStart = catMatches.length > 0

@@ -619,3 +619,37 @@ export function getTeamSlotDisplay(match, slot = 'team1', allMatches = {}) {
   }
   return getMatchSlotSourceLabel(match, slot, allMatches);
 }
+
+/**
+ * Verifica se todas as partidas de todas as categorias sorteadas foram finalizadas.
+ * Quando o último resultado é digitado, o torneio é considerado encerrado.
+ */
+export function checkIsTournamentCompleted(brackets, categories = []) {
+  if (!brackets || typeof brackets !== 'object') return false;
+  const bracketEntries = Object.entries(brackets);
+  if (bracketEntries.length === 0) return false;
+
+  let hasAnyDrawnCategory = false;
+  let totalPlayableMatches = 0;
+  let completedMatches = 0;
+
+  for (const [catId, b] of bracketEntries) {
+    if (!b || !b.matches || typeof b.matches !== 'object') continue;
+    const matchValues = Object.values(b.matches);
+    if (matchValues.length === 0) continue;
+
+    hasAnyDrawnCategory = true;
+    for (const m of matchValues) {
+      // Ignora folgas (BYE)
+      if (m.isBye || m.team1?.isBye || m.team2?.isBye || m.team1?.id?.startsWith('BYE') || m.team2?.id?.startsWith('BYE')) {
+        continue;
+      }
+      totalPlayableMatches++;
+      if (m.status === 'COMPLETED' && m.winnerId) {
+        completedMatches++;
+      }
+    }
+  }
+
+  return hasAnyDrawnCategory && totalPlayableMatches > 0 && completedMatches === totalPlayableMatches;
+}

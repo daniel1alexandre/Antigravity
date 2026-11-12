@@ -178,6 +178,7 @@ export default function LoginScreen({
               <div className="grid grid-cols-1 gap-2.5">
                 {tournaments.map((t) => {
                   const isCurrent = t.id === activeTournamentId || (!activeTournamentId && t.id === tournaments[0]?.id);
+                  const tIsClosed = Boolean(t.status === 'COMPLETED' || t.isCompleted);
                   const tCatsCount = t.categories?.length || 0;
                   const tTeamsCount = t.teams?.length || 0;
                   const tName = t.eventInfo?.name || 'Torneio de Futvôlei';
@@ -215,9 +216,15 @@ export default function LoginScreen({
                                 SELECIONADO
                               </span>
                             )}
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                              INSCRIÇÕES ABERTAS
-                            </span>
+                            {tIsClosed ? (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                TORNEIO ENCERRADO
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                INSCRIÇÕES ABERTAS
+                              </span>
+                            )}
                           </div>
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 mt-1">
                             {tDate && (
@@ -241,20 +248,26 @@ export default function LoginScreen({
 
                       {/* Botão de ação rápida para se inscrever */}
                       <div className="flex items-center gap-2 self-end sm:self-auto flex-shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onSelectTournament && t.id !== activeTournamentId) {
-                              onSelectTournament(t.id);
-                            }
-                            setPublicModal('REGISTER');
-                          }}
-                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-                        >
-                          <UserPlus className="w-3.5 h-3.5" />
-                          <span>Inscrever Dupla</span>
-                        </button>
+                        {tIsClosed ? (
+                          <span className="px-3 py-1.5 rounded-xl bg-slate-800/80 text-slate-500 text-xs font-bold border border-slate-700/60 select-none">
+                            Encerrado
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onSelectTournament && t.id !== activeTournamentId) {
+                                onSelectTournament(t.id);
+                              }
+                              setPublicModal('REGISTER');
+                            }}
+                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                          >
+                            <UserPlus className="w-3.5 h-3.5" />
+                            <span>Inscrever Dupla</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -268,8 +281,13 @@ export default function LoginScreen({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> TORNEIO EM ANDAMENTO
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-black border flex items-center gap-1 ${
+                    Boolean(tournaments.find(t => t.id === activeTournamentId)?.status === 'COMPLETED' || tournaments.find(t => t.id === activeTournamentId)?.isCompleted)
+                      ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                      : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full ${Boolean(tournaments.find(t => t.id === activeTournamentId)?.status === 'COMPLETED' || tournaments.find(t => t.id === activeTournamentId)?.isCompleted) ? 'bg-rose-400' : 'bg-emerald-400 animate-pulse'}`} />
+                    {Boolean(tournaments.find(t => t.id === activeTournamentId)?.status === 'COMPLETED' || tournaments.find(t => t.id === activeTournamentId)?.isCompleted) ? 'TORNEIO ENCERRADO' : 'TORNEIO EM ANDAMENTO'}
                   </span>
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-black font-display text-white mt-2">
@@ -323,39 +341,72 @@ export default function LoginScreen({
                 <p className="text-xs font-semibold text-slate-400">
                   Ações públicas do torneio:
                 </p>
-                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Inscrições Abertas
-                </span>
+                {Boolean(tournaments.find(t => t.id === activeTournamentId)?.status === 'COMPLETED' || tournaments.find(t => t.id === activeTournamentId)?.isCompleted) ? (
+                  <span className="text-[10px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full">
+                    Inscrições Fechadas
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Inscrições Abertas
+                  </span>
+                )}
               </div>
 
               {/* Botão de Destaque: Fazer Inscrição */}
               <button
                 type="button"
+                disabled={Boolean(tournaments.find(t => t.id === activeTournamentId)?.status === 'COMPLETED' || tournaments.find(t => t.id === activeTournamentId)?.isCompleted)}
                 onClick={() => setPublicModal('REGISTER')}
-                className="w-full p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-amber-600/15 to-amber-500/10 hover:from-amber-500/30 hover:to-amber-600/20 border border-amber-500/50 hover:border-amber-400 transition-all duration-200 flex items-center justify-between text-left group shadow-glow-amber cursor-pointer"
+                className={`w-full p-4 rounded-2xl border transition-all duration-200 flex items-center justify-between text-left group ${
+                  Boolean(tournaments.find(t => t.id === activeTournamentId)?.status === 'COMPLETED' || tournaments.find(t => t.id === activeTournamentId)?.isCompleted)
+                    ? 'bg-slate-900/40 border-slate-800 opacity-60 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-amber-500/20 via-amber-600/15 to-amber-500/10 hover:from-amber-500/30 hover:to-amber-600/20 border-amber-500/50 hover:border-amber-400 shadow-glow-amber cursor-pointer'
+                }`}
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold shadow-md group-hover:scale-105 transition-transform flex-shrink-0">
-                    <UserPlus className="w-6 h-6 text-slate-950" />
+                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold shadow-md transition-transform flex-shrink-0 ${
+                    Boolean(tournaments.find(t => t.id === activeTournamentId)?.status === 'COMPLETED' || tournaments.find(t => t.id === activeTournamentId)?.isCompleted)
+                      ? 'bg-slate-800 text-slate-500'
+                      : 'bg-amber-500 text-slate-950 group-hover:scale-105'
+                  }`}>
+                    {Boolean(tournaments.find(t => t.id === activeTournamentId)?.status === 'COMPLETED' || tournaments.find(t => t.id === activeTournamentId)?.isCompleted)
+                      ? <Lock className="w-5 h-5 text-slate-400" />
+                      : <UserPlus className="w-6 h-6 text-slate-950" />
+                    }
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm sm:text-base font-extrabold text-white group-hover:text-amber-300 block">
-                        Fazer Inscrição no Torneio
+                        {Boolean(tournaments.find(t => t.id === activeTournamentId)?.status === 'COMPLETED' || tournaments.find(t => t.id === activeTournamentId)?.isCompleted)
+                          ? 'Inscrições Encerradas'
+                          : 'Fazer Inscrição no Torneio'
+                        }
                       </span>
-                      <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                        ONLINE
+                      <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black border ${
+                        Boolean(tournaments.find(t => t.id === activeTournamentId)?.status === 'COMPLETED' || tournaments.find(t => t.id === activeTournamentId)?.isCompleted)
+                          ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                          : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      }`}>
+                        {Boolean(tournaments.find(t => t.id === activeTournamentId)?.status === 'COMPLETED' || tournaments.find(t => t.id === activeTournamentId)?.isCompleted)
+                          ? 'FINALIZADO'
+                          : 'ONLINE'
+                        }
                       </span>
                     </div>
-                    <span className="text-xs text-amber-200/80">
-                      Cadastre sua dupla, selecione a categoria e garanta sua vaga
+                    <span className="text-xs text-slate-400">
+                      {Boolean(tournaments.find(t => t.id === activeTournamentId)?.status === 'COMPLETED' || tournaments.find(t => t.id === activeTournamentId)?.isCompleted)
+                        ? 'Este torneio já foi encerrado e não recebe novas inscrições'
+                        : 'Cadastre sua dupla, selecione a categoria e garanta sua vaga'
+                      }
                     </span>
                   </div>
                 </div>
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 group-hover:bg-amber-500 group-hover:text-slate-950 text-amber-400 flex items-center justify-center transition-colors flex-shrink-0">
-                  <ArrowRight className="w-4 h-4" />
-                </div>
+                {!Boolean(tournaments.find(t => t.id === activeTournamentId)?.status === 'COMPLETED' || tournaments.find(t => t.id === activeTournamentId)?.isCompleted) && (
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 group-hover:bg-amber-500 group-hover:text-slate-950 text-amber-400 flex items-center justify-center transition-colors flex-shrink-0">
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
+                )}
               </button>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">

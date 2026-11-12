@@ -26,7 +26,7 @@ import {
   deleteTournament,
   switchActiveTournament
 } from './utils/storage';
-import { updateMatchScore } from './utils/doubleEliminationEngine';
+import { updateMatchScore, checkIsTournamentCompleted } from './utils/doubleEliminationEngine';
 import { getCurrentUser, logout } from './utils/auth';
 import { Eye, Lock, Menu, Trophy, Layers } from 'lucide-react';
 
@@ -43,6 +43,7 @@ export default function App() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
   // publicView: null = not set yet, false = logged in panel, true = public view
   const [publicView, setPublicView] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -55,17 +56,57 @@ export default function App() {
   });
   const isReadOnly = !currentUser;
 
-  // Main State & Tournaments
-  const [dataLoaded, setDataLoaded] = useState(false);
-  const [tournaments, setTournaments] = useState([]);
-  const [activeTournamentId, setActiveTournamentId] = useState('');
-  const [eventInfo, setEventInfo] = useState(null);
-  const [categories, setCategories] = useState([]);
-  const [teams, setTeams] = useState([]);
-  const [brackets, setBrackets] = useState({});
+  // Carga inicial síncrona: garante que o link de compartilhamento abra com os dados imediatamente
+  const [initialData] = useState(() => {
+    const loaded = loadTournamentData();
+    let targetTournId = loaded.activeTournamentId || '';
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      const urlTourn = p.get('tournament') || p.get('tournamentId') || p.get('t');
+      if (urlTourn && loaded.tournaments?.some(t => t.id === urlTourn)) {
+        targetTournId = urlTourn;
+      }
+    }
+    const activeT = loaded.tournaments?.find(t => t.id === targetTournId) || loaded.tournaments?.[0] || {};
+    return {
+      tournaments: loaded.tournaments || [],
+      activeTournamentId: targetTournId || activeT.id || '',
+      eventInfo: activeT.eventInfo || loaded.eventInfo,
+      categories: activeT.categories || loaded.categories || [],
+      teams: activeT.teams || loaded.teams || [],
+      brackets: activeT.brackets || loaded.brackets || {},
+    };
+  });
 
-  const [selectedCategoryId, setSelectedCategoryId] = useState('');
-  const [activeTab, setActiveTab] = useState('teams');
+  // Main State & Tournaments
+  const [dataLoaded, setDataLoaded] = useState(true);
+  const [tournaments, setTournaments] = useState(() => initialData.tournaments);
+  const [activeTournamentId, setActiveTournamentId] = useState(() => initialData.activeTournamentId);
+  const [eventInfo, setEventInfo] = useState(() => initialData.eventInfo);
+  const [categories, setCategories] = useState(() => initialData.categories);
+  const [teams, setTeams] = useState(() => initialData.teams);
+  const [brackets, setBrackets] = useState(() => initialData.brackets);
+
+  const [selectedCategoryId, setSelectedCategoryId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      const urlCat = p.get('category');
+      if (urlCat && initialData.categories.some(c => c.id === urlCat)) {
+        return urlCat;
+      }
+    }
+    return initialData.categories[0]?.id || '';
+  });
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      const tabParam = p.get('tab');
+      if (tabParam && ['teams', 'bracket', 'schedule'].includes(tabParam)) {
+        return tabParam;
+      }
+    }
+    return 'teams';
+  });
 
   // Modals & Overlay States
   const [isTournamentManagerOpen, setIsTournamentManagerOpen] = useState(false);
@@ -111,24 +152,6 @@ export default function App() {
     }
     setScoreModalMatch({ ...match, categoryId });
   };
-
-  // Initial Load from Storage
-  useEffect(() => {
-    const loaded = loadTournamentData();
-    setTournaments(loaded.tournaments || []);
-    setActiveTournamentId(loaded.activeTournamentId || '');
-    setEventInfo(loaded.eventInfo);
-    setCategories(loaded.categories || []);
-    setTeams(loaded.teams || []);
-    setBrackets(loaded.brackets || {});
-
-    if (loaded.categories && loaded.categories.length > 0) {
-      setSelectedCategoryId(loaded.categories[0].id);
-    } else {
-      setSelectedCategoryId('');
-    }
-    setDataLoaded(true);
-  }, []);
 
   // Keep selectedCategoryId in sync whenever categories change or load
   useEffect(() => {
@@ -331,10 +354,37 @@ export default function App() {
 
     try {
       const updatedBracket = updateMatchScore(targetBracket, matchId, score1, score2, sets, extraOptions);
-      setBrackets({
+      const newBrackets = {
         ...brackets,
         [targetCatId]: updatedBracket,
-      });
+      };
+      setBrackets(newBrackets);
+
+      // Checa se todas as partidas de todas as categorias foram finalizadas (encerramento do torneio)
+      const isFinished = checkIsTournamentCompleted(newBrackets, categories);
+      const currentTourn = tournaments.find(t => t.id === activeTournamentId) || {};
+
+      if (isFinished) {
+        const updatedTournament = {
+          ...currentTourn,
+          status: 'COMPLETED',
+          isCompleted: true,
+          completedAt: new Date().toISOString(),
+          brackets: newBrackets,
+        };
+        const updatedList = tournaments.map(t => t.id === activeTournamentId ? updatedTournament : t);
+        setTournaments(updatedList);
+        saveTournamentData(updatedTournament, activeTournamentId);
+        alert('🏆 Torneio Finalizado!\n\nO último resultado deste torneio foi lançado com sucesso. O torneio foi considerado ENCERRADO e sua visualização pública foi restrita aos administradores.');
+      } else {
+        const updatedTournament = {
+          ...currentTourn,
+          brackets: newBrackets,
+        };
+        const updatedList = tournaments.map(t => t.id === activeTournamentId ? updatedTournament : t);
+        setTournaments(updatedList);
+        saveTournamentData(updatedTournament, activeTournamentId);
+      }
 
       // Update the active match object if court scoreboard is open
       if (courtScoreboardMatch && courtScoreboardMatch.id === matchId) {
@@ -592,6 +642,7 @@ export default function App() {
             onOpenLiveArena={() => setIsArenaLiveOpen(true)}
             onUpdateCourt={handleUpdateCourt}
             isReadOnly={isReadOnly}
+            activeTournamentId={activeTournamentId}
           />
         )}
 
