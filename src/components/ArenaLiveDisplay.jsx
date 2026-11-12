@@ -739,7 +739,7 @@ export default function ArenaLiveDisplay({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 max-h-[460px] overflow-y-auto p-2">
             {displayedMatches.map((m) => {
               const isBeingDragged = draggedMatch?.id === m.id;
               const isSelected = selectedWaitingMatch?.id === m.id;
@@ -784,17 +784,17 @@ export default function ArenaLiveDisplay({
                       ? "Partida finalizada"
                       : "Aguardando definição dos confrontos anteriores"
                   }
-                  className={`p-3 rounded-2xl border text-xs transition-all duration-150 flex flex-col justify-between gap-2 shadow-sm ${
+                  className={`p-3 rounded-2xl border text-xs transition-colors duration-150 flex flex-col justify-between gap-2 shadow-sm box-border ${
                     isBeingDragged
-                      ? 'opacity-40 border-dashed border-amber-400 bg-amber-500/10 scale-95'
+                      ? 'opacity-40 border-dashed border-amber-400 bg-amber-500/10'
                       : isSelected
                       ? 'bg-amber-500/20 border-amber-400 shadow-glow-amber ring-2 ring-amber-400/50'
                       : m.isLive
                       ? 'bg-slate-900/90 border-emerald-500/60 shadow-glow-emerald cursor-pointer'
                       : m.isReady
-                      ? 'bg-slate-950 border-amber-500/60 hover:border-amber-400 hover:bg-slate-900/90 cursor-grab active:cursor-grabbing hover:-translate-y-0.5'
+                      ? 'bg-slate-950 border-amber-500/60 hover:border-amber-400 hover:bg-slate-900/90 cursor-grab active:cursor-grabbing'
                       : m.isCompleted
-                      ? 'bg-slate-950/60 border-slate-800 opacity-75'
+                      ? 'bg-gradient-to-b from-[#061814] via-slate-950 to-[#030f0c] border-emerald-500/60 shadow-md ring-1 ring-emerald-500/30 hover:border-emerald-400'
                       : 'bg-slate-950/40 border-slate-800/80 opacity-60'
                   }`}
                 >
@@ -825,8 +825,9 @@ export default function ArenaLiveDisplay({
                         <Flame className="w-2.5 h-2.5 fill-current" /> {m.court || 'EM JOGO'}
                       </span>
                     ) : m.isCompleted ? (
-                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40">
-                        {m.score1 !== null ? `${m.score1} x ${m.score2}` : 'FINALIZADO'}
+                      <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-500/60 flex items-center gap-1 shadow-sm uppercase tracking-wider">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        FINALIZADO
                       </span>
                     ) : m.isReady ? (
                       <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
@@ -845,75 +846,114 @@ export default function ArenaLiveDisplay({
                       {m.roundName}
                     </span>
 
-                    <div className="p-2 rounded-xl bg-slate-900/90 border border-slate-800/80 flex items-center justify-between gap-2">
-                      <span className={`font-bold truncate text-xs ${m.winnerId && m.winnerId === m.team1?.id ? 'text-amber-400 font-black' : 'text-slate-100'}`}>
-                        {m.team1Name}
-                      </span>
-                      <span className="text-[10px] font-black text-amber-400/90 px-1.5 bg-slate-950 rounded py-0.5 border border-slate-800">
-                        VS
-                      </span>
-                      <span className={`font-bold truncate text-xs text-right ${m.winnerId && m.winnerId === m.team2?.id ? 'text-amber-400 font-black' : 'text-slate-100'}`}>
-                        {m.team2Name}
-                      </span>
-                    </div>
+                    {m.isCompleted ? (
+                      <div className="p-2.5 rounded-xl bg-slate-950/90 border border-emerald-500/30 flex items-center justify-between gap-2 shadow-inner">
+                        <div className={`flex items-center gap-1.5 truncate text-xs ${m.winnerId && m.winnerId === m.team1?.id ? 'text-emerald-300 font-black' : 'text-slate-400 opacity-60'}`}>
+                          {m.winnerId && m.winnerId === m.team1?.id && <Trophy className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />}
+                          <span className="truncate">{m.team1Name}</span>
+                        </div>
+                        <span className="text-[11px] font-mono font-black text-emerald-300 px-2 py-0.5 bg-emerald-950/90 rounded border border-emerald-500/50 flex-shrink-0 shadow-sm">
+                          {m.score1 !== null && m.score2 !== null ? `${m.score1} x ${m.score2}` : 'FINAL'}
+                        </span>
+                        <div className={`flex items-center gap-1.5 truncate text-xs justify-end ${m.winnerId && m.winnerId === m.team2?.id ? 'text-emerald-300 font-black' : 'text-slate-400 opacity-60'}`}>
+                          <span className="truncate text-right">{m.team2Name}</span>
+                          {m.winnerId && m.winnerId === m.team2?.id && <Trophy className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-2 rounded-xl bg-slate-900/90 border border-slate-800/80 flex items-center justify-between gap-2">
+                        <span className={`font-bold truncate text-xs ${m.winnerId && m.winnerId === m.team1?.id ? 'text-amber-400 font-black' : 'text-slate-100'}`}>
+                          {m.team1Name}
+                        </span>
+                        <span className="text-[10px] font-black text-amber-400/90 px-1.5 bg-slate-950 rounded py-0.5 border border-slate-800">
+                          VS
+                        </span>
+                        <span className={`font-bold truncate text-xs text-right ${m.winnerId && m.winnerId === m.team2?.id ? 'text-amber-400 font-black' : 'text-slate-100'}`}>
+                          {m.team2Name}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Bottom Line: Action / Assignment CTA */}
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1.5 border-t border-slate-800/60 gap-1 flex-wrap">
-                    <span className="text-slate-500">{m.dayName || 'Dia 1'}</span>
-                    
-                    {m.isReady && !isReadOnly ? (
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {availableCourts.length > 0 && (
-                          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                            <span className="text-[9px] text-slate-400 font-bold uppercase">Quadra:</span>
-                            {availableCourts.map(c => {
-                              const shortName = c.name.replace(/Quadra\s*/i, 'Q');
-                              return (
-                                <button
-                                  key={c.id || c.name}
-                                  type="button"
-                                  onClick={() => {
-                                    if (onUpdateCourt) {
-                                      onUpdateCourt(m.id, c.name, m.categoryId);
-                                      setSelectedWaitingMatch(null);
-                                    }
-                                  }}
-                                  title={`Alocar agora na ${c.name}`}
-                                  className="px-2 py-0.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-400 text-emerald-300 hover:text-slate-950 border border-emerald-500/40 text-[10px] font-black transition-all cursor-pointer shadow-sm active:scale-95"
-                                >
-                                  +{shortName}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                        <span 
-                          onClick={() => {
-                            if (selectedWaitingMatch?.id === m.id) {
-                              setSelectedWaitingMatch(null);
-                            } else {
-                              setSelectedWaitingMatch(m);
-                            }
-                          }}
-                          className={`font-bold flex items-center gap-1 cursor-pointer transition-colors px-1.5 py-0.5 rounded-md ${
-                            isSelected ? 'bg-amber-400 text-slate-950 font-black shadow-sm' : 'text-amber-400 hover:text-amber-300'
-                          }`}
-                        >
-                          <GripVertical className="w-3 h-3" />
-                          {isSelected ? 'Quadra selecionada' : 'Mover / Arrastar'}
+                  {m.isCompleted ? (
+                    <div className="flex items-center justify-between text-[10px] pt-1.5 border-t border-emerald-500/25 gap-1 flex-wrap">
+                      <span className="text-slate-500">{m.dayName || 'Dia 1'}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-emerald-400 font-bold flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Concluído
                         </span>
+                        {!isReadOnly && onOpenScoreModal && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenScoreModal(m.categoryId, m);
+                            }}
+                            className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 border border-amber-500/40 text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-sm active:scale-95"
+                            title="Alterar súmula da partida"
+                          >
+                            <Edit3 className="w-2.5 h-2.5 text-amber-400" />
+                            Alterar Súmula
+                          </button>
+                        )}
                       </div>
-                    ) : m.isLive ? (
-                      <span className="text-emerald-400 font-bold flex items-center gap-1">
-                        <Edit3 className="w-3 h-3" /> Lançar Placar
-                      </span>
-                    ) : m.isCompleted ? (
-                      <span className="text-purple-300">Concluído</span>
-                    ) : (
-                      <span className="text-slate-500">Aguardando anteriores</span>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1.5 border-t border-slate-800/60 gap-1 flex-wrap">
+                      <span className="text-slate-500">{m.dayName || 'Dia 1'}</span>
+                      
+                      {m.isReady && !isReadOnly ? (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {availableCourts.length > 0 && (
+                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <span className="text-[9px] text-slate-400 font-bold uppercase">Quadra:</span>
+                              {availableCourts.map(c => {
+                                const shortName = c.name.replace(/Quadra\s*/i, 'Q');
+                                return (
+                                  <button
+                                    key={c.id || c.name}
+                                    type="button"
+                                    onClick={() => {
+                                      if (onUpdateCourt) {
+                                        onUpdateCourt(m.id, c.name, m.categoryId);
+                                        setSelectedWaitingMatch(null);
+                                      }
+                                    }}
+                                    title={`Alocar agora na ${c.name}`}
+                                    className="px-2 py-0.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-400 text-emerald-300 hover:text-slate-950 border border-emerald-500/40 text-[10px] font-black transition-all cursor-pointer shadow-sm active:scale-95"
+                                  >
+                                    +{shortName}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <span 
+                            onClick={() => {
+                              if (selectedWaitingMatch?.id === m.id) {
+                                setSelectedWaitingMatch(null);
+                              } else {
+                                setSelectedWaitingMatch(m);
+                              }
+                            }}
+                            className={`font-bold flex items-center gap-1 cursor-pointer transition-colors px-1.5 py-0.5 rounded-md ${
+                              isSelected ? 'bg-amber-400 text-slate-950 font-black shadow-sm' : 'text-amber-400 hover:text-amber-300'
+                            }`}
+                          >
+                            <GripVertical className="w-3 h-3" />
+                            {isSelected ? 'Quadra selecionada' : 'Mover / Arrastar'}
+                          </span>
+                        </div>
+                      ) : m.isLive ? (
+                        <span className="text-emerald-400 font-bold flex items-center gap-1">
+                          <Edit3 className="w-3 h-3" /> Lançar Placar
+                        </span>
+                      ) : (
+                        <span className="text-slate-500">Aguardando anteriores</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

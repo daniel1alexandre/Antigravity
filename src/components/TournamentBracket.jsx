@@ -22,7 +22,8 @@ import {
   Hand,
   Share2,
   Check,
-  Link2
+  Link2,
+  Edit3
 } from 'lucide-react';
 
 export default function TournamentBracket({ 
@@ -204,22 +205,22 @@ export default function TournamentBracket({
       <div
         key={match.id}
         id={`match-card-${match.id}`}
-        className={`w-80 sm:w-[340px] rounded-2xl p-4 transition-all duration-300 relative group flex flex-col justify-between border ${
-          isTarget
-            ? 'bg-gradient-to-b from-amber-500/25 via-slate-900/95 to-slate-900 border-amber-400 ring-4 ring-amber-400/60 shadow-2xl scale-[1.02] z-10'
+        className={`w-80 sm:w-[340px] rounded-2xl p-4 transition-colors duration-200 relative group flex flex-col justify-between border box-border ${
+          isCompleted
+            ? 'bg-gradient-to-b from-[#061814] via-slate-950 to-[#030f0c] border-emerald-500/70 ring-1 ring-emerald-500/40 shadow-lg shadow-emerald-950/40'
+            : isTarget
+            ? 'bg-gradient-to-b from-amber-500/25 via-slate-900/95 to-slate-900 border-amber-400 ring-2 ring-amber-400/60 shadow-2xl z-10'
             : isBye
-            ? 'bg-gradient-to-b from-purple-950/40 via-slate-900/95 to-slate-950 border-purple-500/50 shadow-lg shadow-purple-950/25 ring-1 ring-purple-500/30'
+            ? 'bg-gradient-to-b from-purple-950/40 via-slate-900/95 to-slate-950 border-purple-500/50 shadow-md ring-1 ring-purple-500/30'
             : hasCourtAssigned
-            ? 'bg-gradient-to-b from-emerald-950/80 via-slate-900/95 to-slate-900/95 border-emerald-400 ring-2 ring-emerald-500/50 shadow-lg shadow-emerald-500/25'
+            ? 'bg-gradient-to-b from-emerald-950/80 via-slate-900/95 to-slate-900/95 border-emerald-400 ring-1 ring-emerald-500/40 shadow-md'
             : isUpcomingSequence
-            ? 'bg-gradient-to-b from-amber-950/40 via-slate-900/90 to-slate-950 border-amber-500/80 ring-2 ring-amber-500/30 shadow-md hover:border-amber-400 hover:scale-[1.01]'
+            ? 'bg-gradient-to-b from-amber-950/40 via-slate-900/90 to-slate-950 border-amber-500/80 ring-1 ring-amber-500/30 shadow-md hover:border-amber-400'
             : isLive
-            ? 'bg-slate-900/95 border-emerald-500 ring-2 ring-emerald-500/30 shadow-glow-emerald'
-            : isCompleted
-            ? 'bg-slate-900/80 border-slate-700/60 opacity-90'
+            ? 'bg-slate-900/95 border-emerald-500 ring-1 ring-emerald-500/30 shadow-glow-emerald'
             : isReady
-            ? 'bg-slate-900/90 border-amber-500/50 hover:border-amber-500 shadow-md'
-            : 'bg-slate-950/60 border-slate-800/80 opacity-70'
+            ? 'bg-slate-900/90 border-amber-500/50 hover:border-amber-400 shadow-sm'
+            : 'bg-slate-950/60 border-slate-800/80 opacity-70 hover:border-slate-700'
         }`}
       >
         {/* Match Header */}
@@ -228,6 +229,8 @@ export default function TournamentBracket({
             <span className={`font-mono px-1.5 py-0.5 rounded border ${
               isBye
                 ? 'text-purple-300 bg-purple-950/80 border-purple-500/60'
+                : isCompleted
+                ? 'text-emerald-300 bg-emerald-950/80 border-emerald-500/60'
                 : hasCourtAssigned 
                 ? 'text-emerald-300 bg-emerald-950/80 border-emerald-500/60' 
                 : isUpcomingSequence
@@ -258,7 +261,8 @@ export default function TournamentBracket({
               <Flame className="w-3 h-3 fill-current" /> AO VIVO
             </span>
           ) : isCompleted ? (
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/25 text-emerald-300 border border-emerald-500/60 flex items-center gap-1 shadow-sm uppercase tracking-wider">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
               FINALIZADO
             </span>
           ) : isReady ? (
@@ -299,7 +303,9 @@ export default function TournamentBracket({
                 : isBye && t1
                 ? 'bg-purple-950/30 border border-purple-500/40 text-purple-200'
                 : t1IsWinner
-                ? 'bg-amber-500/15 border border-amber-500/40 text-amber-300'
+                ? 'bg-gradient-to-r from-emerald-500/25 via-emerald-600/15 to-slate-950 border border-emerald-400 text-emerald-100 shadow-sm'
+                : isCompleted
+                ? 'bg-slate-950/60 border border-slate-800/60 text-slate-400 opacity-60'
                 : hasCourtAssigned
                 ? 'bg-slate-950/90 border border-emerald-500/30 text-slate-200'
                 : isUpcomingSequence
@@ -311,7 +317,7 @@ export default function TournamentBracket({
               {isBye && t1 && !t1IsBye ? (
                 <Crown className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
               ) : t1IsWinner ? (
-                <Crown className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                <Trophy className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
               ) : null}
               <span className={`text-xs truncate ${
                 t1IsBye
@@ -319,7 +325,9 @@ export default function TournamentBracket({
                   : isBye && t1
                   ? 'font-bold text-purple-100'
                   : t1IsWinner
-                  ? 'font-black text-white'
+                  ? 'font-black text-emerald-100'
+                  : isCompleted
+                  ? 'text-slate-400'
                   : t1
                   ? 'font-semibold text-slate-200'
                   : 'font-medium italic text-amber-400/90'
@@ -329,11 +337,15 @@ export default function TournamentBracket({
               {t1?.isSeed && (
                 <span className="text-[10px] text-amber-400 font-bold">#{t1.seedRank}</span>
               )}
-              {isBye && t1 && !t1IsBye && (
+              {isBye && t1 && !t1IsBye ? (
                 <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/25 text-purple-300 font-bold border border-purple-400/30 flex-shrink-0">
                   Classificado
                 </span>
-              )}
+              ) : t1IsWinner ? (
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/30 text-emerald-300 font-black border border-emerald-400/40 uppercase flex-shrink-0">
+                  Venceu
+                </span>
+              ) : null}
             </div>
             <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${
               t1IsBye
@@ -341,7 +353,9 @@ export default function TournamentBracket({
                 : isBye && t1
                 ? 'bg-purple-500/30 text-purple-200 border border-purple-400/40 text-[10px]'
                 : t1IsWinner
-                ? 'bg-amber-500 text-slate-950'
+                ? 'bg-emerald-400 text-slate-950 shadow-sm font-black'
+                : isCompleted
+                ? 'bg-slate-800/80 text-slate-400 font-bold'
                 : hasCourtAssigned
                 ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/30'
                 : 'bg-slate-800 text-slate-300'
@@ -358,7 +372,9 @@ export default function TournamentBracket({
                 : isBye && t2
                 ? 'bg-purple-950/30 border border-purple-500/40 text-purple-200'
                 : t2IsWinner
-                ? 'bg-amber-500/15 border border-amber-500/40 text-amber-300'
+                ? 'bg-gradient-to-r from-emerald-500/25 via-emerald-600/15 to-slate-950 border border-emerald-400 text-emerald-100 shadow-sm'
+                : isCompleted
+                ? 'bg-slate-950/60 border border-slate-800/60 text-slate-400 opacity-60'
                 : hasCourtAssigned
                 ? 'bg-slate-950/90 border border-emerald-500/30 text-slate-200'
                 : isUpcomingSequence
@@ -370,7 +386,7 @@ export default function TournamentBracket({
               {isBye && t2 && !t2IsBye ? (
                 <Crown className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
               ) : t2IsWinner ? (
-                <Crown className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                <Trophy className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
               ) : null}
               <span className={`text-xs truncate ${
                 t2IsBye
@@ -378,7 +394,9 @@ export default function TournamentBracket({
                   : isBye && t2
                   ? 'font-bold text-purple-100'
                   : t2IsWinner
-                  ? 'font-black text-white'
+                  ? 'font-black text-emerald-100'
+                  : isCompleted
+                  ? 'text-slate-400'
                   : t2
                   ? 'font-semibold text-slate-200'
                   : 'font-medium italic text-amber-400/90'
@@ -388,11 +406,15 @@ export default function TournamentBracket({
               {t2?.isSeed && (
                 <span className="text-[10px] text-amber-400 font-bold">#{t2.seedRank}</span>
               )}
-              {isBye && t2 && !t2IsBye && (
+              {isBye && t2 && !t2IsBye ? (
                 <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/25 text-purple-300 font-bold border border-purple-400/30 flex-shrink-0">
                   Classificado
                 </span>
-              )}
+              ) : t2IsWinner ? (
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/30 text-emerald-300 font-black border border-emerald-400/40 uppercase flex-shrink-0">
+                  Venceu
+                </span>
+              ) : null}
             </div>
             <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${
               t2IsBye
@@ -400,7 +422,9 @@ export default function TournamentBracket({
                 : isBye && t2
                 ? 'bg-purple-500/30 text-purple-200 border border-purple-400/40 text-[10px]'
                 : t2IsWinner
-                ? 'bg-amber-500 text-slate-950'
+                ? 'bg-emerald-400 text-slate-950 shadow-sm font-black'
+                : isCompleted
+                ? 'bg-slate-800/80 text-slate-400 font-bold'
                 : hasCourtAssigned
                 ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/30'
                 : 'bg-slate-800 text-slate-300'
@@ -425,6 +449,25 @@ export default function TournamentBracket({
               <Lock className="w-3.5 h-3.5 text-purple-400" />
               <span>Digitação Bloqueada</span>
             </div>
+          </div>
+        ) : isCompleted ? (
+          <div className="mt-3.5 pt-2.5 border-t border-emerald-500/30 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-950/70 border border-emerald-500/40 text-emerald-300 text-xs font-bold truncate flex-1 min-w-0">
+              <Trophy className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+              <span className="truncate">
+                Vencedor: {t1IsWinner ? (t1?.displayName || 'Dupla 1') : t2IsWinner ? (t2?.displayName || 'Dupla 2') : 'Concluído'}
+              </span>
+            </div>
+            {!isReadOnly && (
+              <button
+                onClick={() => onOpenScoreModal(match)}
+                title="Alterar Resultado da Súmula deste jogo"
+                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 border border-amber-500/40 flex items-center gap-1.5 transition-colors cursor-pointer flex-shrink-0 shadow-sm active:scale-95"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                <span>Alterar Súmula</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="mt-3.5 pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-2">
@@ -718,7 +761,7 @@ export default function TournamentBracket({
             onMouseMove={(e) => handleMouseMove(e, winnersScrollRef, isDraggingWinners, winnersStartX, winnersScrollLeft)}
             onMouseUp={() => handleMouseUpOrLeave(setIsDraggingWinners)}
             onMouseLeave={() => handleMouseUpOrLeave(setIsDraggingWinners)}
-            className={`overflow-x-auto pb-4 pt-2 no-scrollbar select-none transition-colors ${
+            className={`overflow-x-auto pb-6 pt-5 px-3 no-scrollbar select-none transition-colors ${
               isDraggingWinners ? 'cursor-grabbing' : 'cursor-grab'
             }`}
           >
@@ -798,7 +841,7 @@ export default function TournamentBracket({
             onMouseMove={(e) => handleMouseMove(e, losersScrollRef, isDraggingLosers, losersStartX, losersScrollLeft)}
             onMouseUp={() => handleMouseUpOrLeave(setIsDraggingLosers)}
             onMouseLeave={() => handleMouseUpOrLeave(setIsDraggingLosers)}
-            className={`overflow-x-auto pb-4 pt-2 no-scrollbar select-none transition-colors ${
+            className={`overflow-x-auto pb-6 pt-5 px-3 no-scrollbar select-none transition-colors ${
               isDraggingLosers ? 'cursor-grabbing' : 'cursor-grab'
             }`}
           >
