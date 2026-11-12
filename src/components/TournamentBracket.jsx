@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getMatchSlotSourceLabel } from '../utils/doubleEliminationEngine';
 import { 
   GitBranch, 
@@ -8,8 +8,8 @@ import {
   CheckCircle2, 
   Clock, 
   ChevronRight, 
+  ChevronLeft,
   Tv, 
-  Printer, 
   Shuffle, 
   ShieldAlert, 
   Crown,
@@ -18,7 +18,11 @@ import {
   Maximize2,
   XCircle,
   Coffee,
-  Lock
+  Lock,
+  Hand,
+  Share2,
+  Check,
+  Link2
 } from 'lucide-react';
 
 export default function TournamentBracket({ 
@@ -39,6 +43,79 @@ export default function TournamentBracket({
   isReadOnly = false
 }) {
   const [activeBracketView, setActiveBracketView] = useState('ALL'); // 'ALL', 'WINNERS', 'LOSERS', 'FINAL'
+  const [copiedShare, setCopiedShare] = useState(false);
+
+  // Compartilhar link de visualização dos jogos (somente leitura para o público)
+  const handleSharePublicBracket = async () => {
+    const origin = window.location.origin;
+    const path = window.location.pathname;
+    const catId = selectedCategoryId || category?.id || '';
+    const shareUrl = `${origin}${path}?view=public&tab=bracket${catId ? `&category=${catId}` : ''}`;
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        const input = document.createElement('input');
+        input.value = shareUrl;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+      }
+      setCopiedShare(true);
+      setTimeout(() => setCopiedShare(false), 3000);
+    } catch (err) {
+      console.warn('Erro ao copiar link:', err);
+    }
+
+    if (navigator.share && window.innerWidth < 768) {
+      try {
+        await navigator.share({
+          title: `Chaveamento - ${category?.name || 'Futvôlei'}`,
+          text: `Acompanhe ao vivo os jogos da categoria ${category?.name || ''}!`,
+          url: shareUrl,
+        });
+      } catch (e) {}
+    }
+  };
+
+  // Refs e Handlers para Drag-to-Scroll e navegação lateral com a mãozinha
+  const winnersScrollRef = useRef(null);
+  const losersScrollRef = useRef(null);
+
+  const [isDraggingWinners, setIsDraggingWinners] = useState(false);
+  const [winnersStartX, setWinnersStartX] = useState(0);
+  const [winnersScrollLeft, setWinnersScrollLeft] = useState(0);
+
+  const [isDraggingLosers, setIsDraggingLosers] = useState(false);
+  const [losersStartX, setLosersStartX] = useState(0);
+  const [losersScrollLeft, setLosersScrollLeft] = useState(0);
+
+  const handleMouseDown = (e, ref, setIsDragging, setStartX, setScrollLeft) => {
+    if (e.target.closest('button, select, input, a')) return;
+    setIsDragging(true);
+    setStartX(e.pageX - ref.current.offsetLeft);
+    setScrollLeft(ref.current.scrollLeft);
+  };
+
+  const handleMouseMove = (e, ref, isDragging, startX, scrollLeft) => {
+    if (!isDragging || !ref.current) return;
+    e.preventDefault();
+    const x = e.pageX - ref.current.offsetLeft;
+    const walk = (x - startX) * 1.5;
+    ref.current.scrollLeft = scrollLeft - walk;
+  };
+
+  const handleMouseUpOrLeave = (setIsDragging) => {
+    setIsDragging(false);
+  };
+
+  const scrollContainer = (ref, direction) => {
+    if (!ref.current) return;
+    const amount = direction === 'left' ? -360 : 360;
+    ref.current.scrollBy({ left: amount, behavior: 'smooth' });
+  };
 
   // Auto-scroll and highlight target match when redirected from Telão
   useEffect(() => {
@@ -498,13 +575,29 @@ export default function TournamentBracket({
 
             {/* Actions */}
             <div className="flex items-center gap-2">
+              {/* Botão de Compartilhar Link Público dos Jogos */}
               <button
-                onClick={() => window.print()}
-                title="Imprimir Súmula e Tabela"
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
+                onClick={handleSharePublicBracket}
+                title="Copiar e compartilhar link de visualização dos jogos (somente leitura para o público)"
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer select-none active:scale-95 ${
+                  copiedShare
+                    ? 'bg-emerald-500 text-slate-950 shadow-glow-emerald'
+                    : 'bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 border border-amber-500/30'
+                }`}
               >
-                <Printer className="w-4 h-4" />
+                {copiedShare ? (
+                  <>
+                    <Check className="w-4 h-4 text-slate-950" />
+                    <span>Link Copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="w-4 h-4 text-amber-400" />
+                    <span>Compartilhar Jogos</span>
+                  </>
+                )}
               </button>
+
               <button
                 onClick={onOpenLiveArena}
                 title="Abrir Modo Telão da Arena"
@@ -564,20 +657,64 @@ export default function TournamentBracket({
           {/* 1. WINNERS BRACKET (CHAVE DOS VENCEDORES) */}
       {(activeBracketView === 'ALL' || activeBracketView === 'WINNERS') && (
         <div className="glass-panel p-6 rounded-3xl space-y-4 border border-amber-500/20">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-2">
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
                 <Trophy className="w-4 h-4" />
               </div>
-              <h3 className="text-lg font-bold text-white font-display">
-                Chave Principal dos Vencedores (Winners Bracket)
-              </h3>
+              <div>
+                <h3 className="text-lg font-bold text-white font-display">
+                  Chave Principal dos Vencedores (Winners Bracket)
+                </h3>
+                <span className="text-xs text-slate-400 block sm:hidden">Quem vencer segue em frente rumo à Grande Final</span>
+              </div>
             </div>
-            <span className="text-xs text-slate-400">Quem vencer segue em frente rumo à Grande Final</span>
+
+            <div className="flex items-center justify-between sm:justify-end gap-3">
+              <span className="text-xs text-slate-400 hidden sm:inline">Quem vencer segue em frente rumo à Grande Final</span>
+              
+              {/* Botão de Mãozinha para Rolar a Tela para o Lado */}
+              <div className="flex items-center gap-1.5 bg-slate-900/90 px-2 py-1 rounded-xl border border-slate-700/80 shadow-inner flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => scrollContainer(winnersScrollRef, 'left')}
+                  className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all active:scale-95 cursor-pointer"
+                  title="Rolar rodadas para a esquerda"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollContainer(winnersScrollRef, 'right')}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 text-[11px] font-bold transition-all cursor-pointer select-none active:scale-95"
+                  title="Clique para avançar ou clique e arraste com a mãozinha na tela"
+                >
+                  <Hand className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                  <span>Rolar Chave</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollContainer(winnersScrollRef, 'right')}
+                  className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all active:scale-95 cursor-pointer"
+                  title="Rolar rodadas para a direita"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Horizontal Rounds Flow */}
-          <div className="overflow-x-auto pb-4 pt-2">
+          {/* Horizontal Rounds Flow com Drag-to-Scroll e sem barra inferior */}
+          <div 
+            ref={winnersScrollRef}
+            onMouseDown={(e) => handleMouseDown(e, winnersScrollRef, setIsDraggingWinners, setWinnersStartX, setWinnersScrollLeft)}
+            onMouseMove={(e) => handleMouseMove(e, winnersScrollRef, isDraggingWinners, winnersStartX, winnersScrollLeft)}
+            onMouseUp={() => handleMouseUpOrLeave(setIsDraggingWinners)}
+            onMouseLeave={() => handleMouseUpOrLeave(setIsDraggingWinners)}
+            className={`overflow-x-auto pb-4 pt-2 no-scrollbar select-none transition-colors ${
+              isDraggingWinners ? 'cursor-grabbing' : 'cursor-grab'
+            }`}
+          >
             <div className="flex items-start gap-8 min-w-max">
               {winnersRounds.map((roundObj, rIdx) => (
                 <div key={roundObj.round} className="space-y-4">
@@ -600,20 +737,64 @@ export default function TournamentBracket({
       {/* 2. LOSERS BRACKET (CHAVE DE REPESCAGEM) */}
       {(activeBracketView === 'ALL' || activeBracketView === 'LOSERS') && (
         <div className="glass-panel p-6 rounded-3xl space-y-4 border border-cyan-500/20">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-2">
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400">
                 <GitBranch className="w-4 h-4" />
               </div>
-              <h3 className="text-lg font-bold text-white font-display">
-                Chave de Repescagem (Losers Bracket — 2ª Chance)
-              </h3>
+              <div>
+                <h3 className="text-lg font-bold text-white font-display">
+                  Chave de Repescagem (Losers Bracket — 2ª Chance)
+                </h3>
+                <span className="text-xs text-slate-400 block sm:hidden">Perdedores da chave principal lutam pelo pódio e vaga na Final</span>
+              </div>
             </div>
-            <span className="text-xs text-slate-400">Perdedores da chave principal lutam pelo pódio e vaga na Final</span>
+
+            <div className="flex items-center justify-between sm:justify-end gap-3">
+              <span className="text-xs text-slate-400 hidden sm:inline">Perdedores da chave principal lutam pelo pódio e vaga na Final</span>
+
+              {/* Botão de Mãozinha para Rolar a Tela para o Lado */}
+              <div className="flex items-center gap-1.5 bg-slate-900/90 px-2 py-1 rounded-xl border border-slate-700/80 shadow-inner flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => scrollContainer(losersScrollRef, 'left')}
+                  className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all active:scale-95 cursor-pointer"
+                  title="Rolar repescagem para a esquerda"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollContainer(losersScrollRef, 'right')}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25 border border-cyan-500/30 text-[11px] font-bold transition-all cursor-pointer select-none active:scale-95"
+                  title="Clique para avançar ou clique e arraste com a mãozinha na tela"
+                >
+                  <Hand className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+                  <span>Rolar Chave</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollContainer(losersScrollRef, 'right')}
+                  className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all active:scale-95 cursor-pointer"
+                  title="Rolar repescagem para a direita"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Horizontal Rounds Flow */}
-          <div className="overflow-x-auto pb-4 pt-2">
+          {/* Horizontal Rounds Flow com Drag-to-Scroll e sem barra inferior */}
+          <div 
+            ref={losersScrollRef}
+            onMouseDown={(e) => handleMouseDown(e, losersScrollRef, setIsDraggingLosers, setLosersStartX, setLosersScrollLeft)}
+            onMouseMove={(e) => handleMouseMove(e, losersScrollRef, isDraggingLosers, losersStartX, losersScrollLeft)}
+            onMouseUp={() => handleMouseUpOrLeave(setIsDraggingLosers)}
+            onMouseLeave={() => handleMouseUpOrLeave(setIsDraggingLosers)}
+            className={`overflow-x-auto pb-4 pt-2 no-scrollbar select-none transition-colors ${
+              isDraggingLosers ? 'cursor-grabbing' : 'cursor-grab'
+            }`}
+          >
             <div className="flex items-start gap-8 min-w-max">
               {losersRounds.map((roundObj, lrIdx) => (
                 <div key={roundObj.round} className="space-y-4">

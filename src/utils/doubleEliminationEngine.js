@@ -401,9 +401,75 @@ function propagateResult(matches, match, winningTeam, losingTeam) {
 }
 
 /**
+ * Automatically resolves matches where a team forfeited by W.O. in an earlier round.
+ * A equipe perdedora por W.O. recebe 0 x 18 em todas as partidas seguintes,
+ * avançando o adversário presente automaticamente.
+ */
+export function autoResolveWalkovers(state, targetPoints = 18) {
+  const walkoverTeams = state.walkoverTeams || {};
+  if (Object.keys(walkoverTeams).length === 0) return state;
+
+  const updatedMatches = { ...state.matches };
+  let resolvedAny = false;
+
+  do {
+    resolvedAny = false;
+    for (const mId in updatedMatches) {
+      const match = updatedMatches[mId];
+      if (match.status === 'COMPLETED' || match.isBye) continue;
+
+      const t1 = match.team1;
+      const t2 = match.team2;
+
+      const t1IsWO = t1 && Boolean(walkoverTeams[t1.id]);
+      const t2IsWO = t2 && Boolean(walkoverTeams[t2.id]);
+
+      // Se uma ou ambas as equipes deram W.O.
+      if ((t1IsWO || t2IsWO) && t1 && t2) {
+        if (t1IsWO && t2IsWO) {
+          match.status = 'COMPLETED';
+          match.isWO = true;
+          match.score1 = 0;
+          match.score2 = 0;
+          match.sets = [{ s1: 0, s2: 0 }];
+          match.winnerId = t1.id;
+          match.loserId = t2.id;
+          propagateResult(updatedMatches, match, t1, t2);
+          resolvedAny = true;
+        } else if (t1IsWO) {
+          // Equipe 1 deu W.O.: Equipe 1 recebe 0 e Equipe 2 (vencedora) recebe 18
+          match.status = 'COMPLETED';
+          match.isWO = true;
+          match.score1 = 0;
+          match.score2 = targetPoints;
+          match.sets = [{ s1: 0, s2: targetPoints }];
+          match.winnerId = t2.id;
+          match.loserId = t1.id;
+          propagateResult(updatedMatches, match, t2, t1);
+          resolvedAny = true;
+        } else if (t2IsWO) {
+          // Equipe 2 deu W.O.: Equipe 1 (vencedora) recebe 18 e Equipe 2 recebe 0
+          match.status = 'COMPLETED';
+          match.isWO = true;
+          match.score1 = targetPoints;
+          match.score2 = 0;
+          match.sets = [{ s1: targetPoints, s2: 0 }];
+          match.winnerId = t1.id;
+          match.loserId = t2.id;
+          propagateResult(updatedMatches, match, t1, t2);
+          resolvedAny = true;
+        }
+      }
+    }
+  } while (resolvedAny);
+
+  return { ...state, matches: updatedMatches, walkoverTeams };
+}
+
+/**
  * Updates score and advances teams for a played match
  */
-export function updateMatchScore(state, matchId, score1, score2, sets = []) {
+export function updateMatchScore(state, matchId, score1, score2, sets = [], options = {}) {
   const matches = { ...state.matches };
   const match = { ...matches[matchId] };
 
@@ -426,15 +492,41 @@ export function updateMatchScore(state, matchId, score1, score2, sets = []) {
   match.loserId = losingTeam.id;
   match.status = 'COMPLETED';
 
+  // Opções de W.O. ou Retirada
+  if (options.isWO) {
+    match.isWO = true;
+    match.woWinner = options.woWinner;
+    match.woLoser = losingTeam.id;
+  } else {
+    match.isWO = false;
+  }
+
+  if (options.isRetirement) {
+    match.isRetirement = true;
+    match.retiredTeam = options.retiredTeam;
+  } else {
+    match.isRetirement = false;
+  }
+
   matches[matchId] = match;
 
   // Propagate results
   propagateResult(matches, match, winningTeam, losingTeam);
 
-  let newState = { ...state, matches };
+  let walkoverTeams = { ...(state.walkoverTeams || {}) };
+  // Se foi W.O., marca a equipe perdedora para receber 0 x 18 nas partidas seguintes
+  if (options.isWO && losingTeam?.id) {
+    walkoverTeams[losingTeam.id] = true;
+  }
+
+  let newState = { ...state, matches, walkoverTeams };
 
   // Auto-resolve any new BYE encounters that were formed by the propagation
   newState = autoResolveByes(newState);
+
+  // Auto-resolve matches for teams that gave W.O. in earlier rounds
+  const targetPts = Math.max(match.score1, match.score2, 18);
+  newState = autoResolveWalkovers(newState, targetPts);
 
   // Compute final standings if Grand Final completed
   let standings = [...(newState.standings || [])];

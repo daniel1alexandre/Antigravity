@@ -48,7 +48,7 @@ export default function ArenaLiveDisplay({
   const [draggedMatch, setDraggedMatch] = useState(null);
   const [dragOverCourt, setDragOverCourt] = useState(null);
   const [selectedWaitingMatch, setSelectedWaitingMatch] = useState(null);
-  const [queueFilter, setQueueFilter] = useState('ALL'); // 'ALL' | 'READY' | 'LIVE' | 'COMPLETED'
+  const [queueFilter, setQueueFilter] = useState('PENDING'); // 'PENDING' | 'READY' | 'LIVE' | 'COMPLETED'
 
   // Compute official tournament schedule for multi-day support
   const scheduleData = useMemo(() => {
@@ -224,16 +224,18 @@ export default function ArenaLiveDisplay({
   });
 
   // Categorize lists for UI
+  const pendingDayMatches = sortedDayMatches.filter(m => !m.isCompleted);
   const readyQueueMatches = sortedDayMatches.filter(m => m.isReady);
   const liveDayMatches = sortedDayMatches.filter(m => m.isLive);
   const completedDayMatches = sortedDayMatches.filter(m => m.isCompleted);
 
   // Filter for display based on sub-tab
+  // Os jogos com placar lançado saem desta lista padrão (ficando apenas jogos a serem jogados/lançados)
   const displayedMatches = sortedDayMatches.filter(m => {
     if (queueFilter === 'READY') return m.isReady;
     if (queueFilter === 'LIVE') return m.isLive;
     if (queueFilter === 'COMPLETED') return m.isCompleted;
-    return true; // 'ALL'
+    return !m.isCompleted; // 'PENDING' ou padrão: apenas os jogos a serem lançados para jogar
   });
 
   // Drop handler for free court
@@ -676,22 +678,22 @@ export default function ArenaLiveDisplay({
           <div>
             <h3 className="font-bold text-sm sm:text-base text-amber-400 font-display flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              Programação & Próximas Chamadas ({activeDayId === 'ALL' ? 'Todos os Dias' : selectedDay?.name || 'Dia 1'})
+              Jogos a Lançar & Próximas Chamadas ({activeDayId === 'ALL' ? 'Todos os Dias' : selectedDay?.name || 'Dia 1'})
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Partidas organizadas em ordem cronológica de horário e sequência de rodadas da chave.
+              Exibindo apenas os confrontos a serem jogados. Jogos com placar lançado são removidos automaticamente desta fila.
             </p>
           </div>
 
-          {/* Sub-Filters: Todos, Prontos, Ao Vivo, Finalizados */}
+          {/* Sub-Filters: A Lançar (Sem Placar), Prontos, Ao Vivo, Finalizados */}
           <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs flex-wrap">
             <button
-              onClick={() => setQueueFilter('ALL')}
+              onClick={() => setQueueFilter('PENDING')}
               className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
-                queueFilter === 'ALL' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                queueFilter === 'PENDING' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
               }`}
             >
-              Todos ({sortedDayMatches.length})
+              A Lançar ({pendingDayMatches.length})
             </button>
             <button
               onClick={() => setQueueFilter('READY')}
@@ -728,12 +730,12 @@ export default function ArenaLiveDisplay({
             <Clock className="w-8 h-8 text-slate-600 mx-auto" />
             <p className="text-sm font-semibold text-slate-400">
               {queueFilter === 'READY' 
-                ? 'Nenhum confronto aguardando alocação de quadra no momento.' 
+                ? 'Nenhum confronto pronto aguardando alocação de quadra no momento.' 
                 : queueFilter === 'LIVE'
                 ? 'Nenhuma partida em andamento no momento.'
                 : queueFilter === 'COMPLETED'
                 ? 'Nenhuma partida finalizada ainda.'
-                : 'Nenhum confronto agendado para este dia.'}
+                : 'Todos os confrontos agendados para este dia já foram lançados e finalizados!'}
             </p>
           </div>
         ) : (

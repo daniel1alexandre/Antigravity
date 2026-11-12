@@ -44,7 +44,15 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   // publicView: null = not set yet, false = logged in panel, true = public view
-  const [publicView, setPublicView] = useState(null);
+  const [publicView, setPublicView] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('view') === 'public' || params.get('public') === 'true') {
+        return true;
+      }
+    }
+    return null;
+  });
   const isReadOnly = !currentUser;
 
   // Main State & Tournaments
@@ -304,7 +312,7 @@ export default function App() {
   const currentCategoryTeams = activeCategoryId ? teams.filter(t => t.categoryId === activeCategoryId) : [];
 
   // Update Match Score & Advance Bracket (supports match from any category)
-  const handleSaveScore = (matchId, score1, score2, sets, matchCategoryId) => {
+  const handleSaveScore = (matchId, score1, score2, sets, matchCategoryId, extraOptions = {}) => {
     const targetCatId = matchCategoryId || scoreModalMatch?.categoryId || activeCategoryId;
     const targetBracket = brackets[targetCatId];
     if (!targetBracket) return;
@@ -316,7 +324,7 @@ export default function App() {
     }
 
     try {
-      const updatedBracket = updateMatchScore(targetBracket, matchId, score1, score2, sets);
+      const updatedBracket = updateMatchScore(targetBracket, matchId, score1, score2, sets, extraOptions);
       setBrackets({
         ...brackets,
         [targetCatId]: updatedBracket,

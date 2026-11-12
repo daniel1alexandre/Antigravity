@@ -262,8 +262,40 @@ export default function PublicViewScreen({
   onGoToLogin,
   onRegisterTeam,
 }) {
-  const [activeTab, setActiveTab] = useState('teams');
-  const [selectedCategoryId, setSelectedCategoryId] = useState(categories[0]?.id || '');
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      const tabParam = p.get('tab');
+      if (tabParam && ['teams', 'bracket', 'schedule'].includes(tabParam)) {
+        return tabParam;
+      }
+    }
+    return 'teams';
+  });
+
+  const [selectedCategoryId, setSelectedCategoryId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      const catParam = p.get('category');
+      if (catParam && categories.some(c => c.id === catParam)) {
+        return catParam;
+      }
+    }
+    return categories[0]?.id || '';
+  });
+
+  // Atualiza a categoria selecionada se a URL tiver parâmetro de categoria
+  useEffect(() => {
+    if (typeof window !== 'undefined' && categories.length > 0) {
+      const p = new URLSearchParams(window.location.search);
+      const catParam = p.get('category');
+      if (catParam && categories.some(c => c.id === catParam)) {
+        setSelectedCategoryId(catParam);
+      } else if (!selectedCategoryId) {
+        setSelectedCategoryId(categories[0].id);
+      }
+    }
+  }, [categories]);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [registerDefaultCatId, setRegisterDefaultCatId] = useState(null);
 
