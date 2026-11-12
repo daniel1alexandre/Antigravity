@@ -278,6 +278,9 @@ export default function App() {
         categories={categories}
         teams={teams}
         brackets={brackets}
+        tournaments={tournaments}
+        activeTournamentId={activeTournamentId}
+        onSelectTournament={handleSelectTournament}
         onLoginSuccess={(user) => {
           setCurrentUser(user);
           setPublicView(null);
@@ -296,6 +299,9 @@ export default function App() {
         categories={categories}
         teams={teams}
         brackets={brackets}
+        tournaments={tournaments}
+        activeTournamentId={activeTournamentId}
+        onSelectTournament={handleSelectTournament}
         onGoToLogin={() => {
           setPublicView(null);
         }}
@@ -764,6 +770,9 @@ export default function App() {
             categories={categories}
             teams={teams}
             brackets={brackets}
+            tournaments={tournaments}
+            activeTournamentId={activeTournamentId}
+            onSelectTournament={handleSelectTournament}
             onClose={() => setIsLoginModalOpen(false)}
             onRegisterTeam={handleRegisterTeam}
             onLoginSuccess={(user) => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   GitBranch,
@@ -259,6 +259,9 @@ export default function PublicViewScreen({
   categories = [],
   teams = [],
   brackets = {},
+  tournaments = [],
+  activeTournamentId = '',
+  onSelectTournament,
   onGoToLogin,
   onRegisterTeam,
 }) {
@@ -316,8 +319,19 @@ export default function PublicViewScreen({
       {/* ── Header ── */}
       <header className="sticky top-0 z-40 bg-[#070B12]/95 backdrop-blur-md border-b border-slate-800/80 shadow-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
-          {/* Brand */}
-          <div className="flex items-center gap-3 min-w-0">
+          {/* Brand & Voltar */}
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+            {onGoToLogin && (
+              <button
+                onClick={onGoToLogin}
+                className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 text-xs font-bold transition-all shadow-sm cursor-pointer flex-shrink-0 active:scale-95"
+                title="Voltar para a página principal"
+              >
+                <ArrowLeft className="w-4 h-4 text-amber-400" />
+                <span className="font-extrabold">Voltar</span>
+              </button>
+            )}
+
             <div className="w-10 h-10 rounded-xl overflow-hidden border border-amber-500/40 bg-slate-900 flex-shrink-0 shadow-lg">
               <img src="/db-logo.jpg" alt="DB Logo" className="w-full h-full object-cover" />
             </div>
@@ -331,9 +345,28 @@ export default function PublicViewScreen({
                   VISUALIZAÇÃO PÚBLICA
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 truncate hidden sm:block">
-                {eventInfo?.name || 'Torneio'} • {eventInfo?.organizer || 'DB Sports'}
-              </p>
+              <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                <span className="truncate hidden sm:inline">
+                  {eventInfo?.name || 'Torneio'} • {eventInfo?.organizer || 'DB Sports'}
+                </span>
+                {tournaments && tournaments.length > 1 && onSelectTournament && (
+                  <div className="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/80 rounded-lg px-2 py-0.5">
+                    <Trophy className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                    <select
+                      value={activeTournamentId}
+                      onChange={(e) => onSelectTournament(e.target.value)}
+                      aria-label="Trocar torneio"
+                      className="bg-transparent text-amber-300 font-bold text-[10px] focus:outline-none cursor-pointer max-w-[150px] truncate"
+                    >
+                      {tournaments.map((t) => (
+                        <option key={t.id} value={t.id} className="bg-slate-900 text-white">
+                          {t.eventInfo?.name || 'Torneio'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

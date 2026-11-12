@@ -53,23 +53,25 @@ export default function PublicRegistrationModal({
       return;
     }
     if (!teamName.trim()) {
-      setErrorMessage('Por favor, informe o nome da dupla.');
+      setErrorMessage('Por favor, informe o Nome da Dupla.');
       return;
     }
     if (!player1Name.trim()) {
-      setErrorMessage('Por favor, informe o nome do Atleta 1.');
+      setErrorMessage('O Nome Completo do Atleta 1 é obrigatório para a inscrição.');
       return;
     }
-    if (!player1Phone.trim()) {
-      setErrorMessage('Por favor, informe o telefone do Atleta 1.');
+    const cleanPhone1 = player1Phone.replace(/\D/g, '');
+    if (!player1Phone.trim() || cleanPhone1.length < 8) {
+      setErrorMessage('O Telefone / WhatsApp do Atleta 1 é obrigatório (informe DDD + número).');
       return;
     }
     if (!player2Name.trim()) {
-      setErrorMessage('Por favor, informe o nome do Atleta 2.');
+      setErrorMessage('O Nome Completo do Atleta 2 é obrigatório para a inscrição.');
       return;
     }
-    if (!player2Phone.trim()) {
-      setErrorMessage('Por favor, informe o telefone do Atleta 2.');
+    const cleanPhone2 = player2Phone.replace(/\D/g, '');
+    if (!player2Phone.trim() || cleanPhone2.length < 8) {
+      setErrorMessage('O Telefone / WhatsApp do Atleta 2 é obrigatório (informe DDD + número).');
       return;
     }
 
@@ -439,8 +441,8 @@ export default function PublicRegistrationModal({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] text-slate-400 mb-1 font-semibold">
-                      Nome Completo *
+                    <label className="block text-[11px] text-slate-300 mb-1 font-bold">
+                      Nome Completo <span className="text-rose-400 font-extrabold">* (Obrigatório)</span>
                     </label>
                     <input
                       type="text"
@@ -453,8 +455,8 @@ export default function PublicRegistrationModal({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] text-slate-400 mb-1 font-semibold">
-                      Telefone / WhatsApp *
+                    <label className="block text-[11px] text-slate-300 mb-1 font-bold">
+                      Telefone / WhatsApp <span className="text-rose-400 font-extrabold">* (Obrigatório)</span>
                     </label>
                     <div className="relative">
                       <Phone className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -484,8 +486,8 @@ export default function PublicRegistrationModal({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] text-slate-400 mb-1 font-semibold">
-                      Nome Completo *
+                    <label className="block text-[11px] text-slate-300 mb-1 font-bold">
+                      Nome Completo <span className="text-rose-400 font-extrabold">* (Obrigatório)</span>
                     </label>
                     <input
                       type="text"
@@ -498,8 +500,8 @@ export default function PublicRegistrationModal({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] text-slate-400 mb-1 font-semibold">
-                      Telefone / WhatsApp *
+                    <label className="block text-[11px] text-slate-300 mb-1 font-bold">
+                      Telefone / WhatsApp <span className="text-rose-400 font-extrabold">* (Obrigatório)</span>
                     </label>
                     <div className="relative">
                       <Phone className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
